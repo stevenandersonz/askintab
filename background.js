@@ -6,8 +6,8 @@ const LLMSETUP = {
 } 
 const LLM = "chatgpt"
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "STREAMING_COMPLETE") {
-    console.log("STREAMING_COMPLETE")
+  if (message.type === "NEW_NODE") {
+    console.log(message)
   }
   if (message.type === "STREAMING_RESPONSE") {
     console.log(message.data)
@@ -47,6 +47,7 @@ function injectFunctions(text, senderId, UI) {
     function pasteTextAndSend(text, senderId) {
         console.log("Pasting text into the textarea...");
 
+        observeConversation()
         const textarea = document.querySelector(UI.textArea);
         if (!textarea) {
             console.log("Textarea not found.");
@@ -66,7 +67,6 @@ function injectFunctions(text, senderId, UI) {
                     type: "PROMPT_SENT",
                     activeTab: senderId
                 })
-                observeConversation()
             } else if (retries > 0) {
                 console.log(`Send button not found, retrying (${retries} left)...`);
                 setTimeout(() => findAndClickButton(retries - 1), 500);
@@ -79,58 +79,32 @@ function injectFunctions(text, senderId, UI) {
     }
 
     function observeConversation() {
-      let timer = null;
-      // Adjust this selector to match ChatGPT's conversation container
-      const conversationContainer = document.querySelector('div[class*="@container/thread"]'); 
-      if (!conversationContainer) {
-          console.error("Conversation container not found.");
-          return;
-      }
-
-      const observer = new MutationObserver((mutationsList) => {
-            mutationsList.forEach(mutation => {
-              mutation.addedNodes.forEach(node => {
-                  if (node.nodeType === Node.ELEMENT_NODE && node.matches('div.prose')) {
-                    observeStreamingDiv(node) 
-                  }
-              });
-          });
-      });
-
-
-      observer.observe(conversationContainer, { childList: true, subtree: true });
-
-      function observeStreamingDiv(streamingDiv) {
-        const streamObserver = new MutationObserver((mutations) => {
-            mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        clearTimeout(timer);
-                        console.log("Added streaming content:", node.textContent.trim());
-                        chrome.runtime.sendMessage({
-                          type: "STREAMING_RESPONSE",
-                          data: node.textContent.trim(),
-                          activeTab: senderId
-                        })
-                    }
-                });
+      const targetNode = document.body;
+      const config = { childList: true, subtree: true, characterData: true };
+    
+      const callback = function(mutationsList) {
+        for (const mutation of mutationsList) {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(node => {
+              if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
+                const text = node.textContent.trim();
+                if (text) {
+                  chrome.runtime.sendMessage({ type: "NEW_NODE", text, from:"childlist" });
+                }
+              }
             });
-            timer = setTimeout(() => {
-              console.log("No changes detected for 1000ms. Closing observer.");
-              observer.disconnect(); // Stop observing
-  
-              // Send a message to the background script (or elsewhere)
-              chrome.runtime.sendMessage({
-                  type: "STREAMING_COMPLETE",
-                  data: res // Optionally send the collected nodes or other data
-              });
-          }, 1000);
-        });
-
-        streamObserver.observe(streamingDiv, { childList: true, subtree: true });
-      }
+          } else if (mutation.type === 'characterData') {
+            const text = mutation.target.textContent.trim();
+            if (text) {
+              chrome.runtime.sendMessage({ type: "NEW_NODE", text, from: "characterdata" });
+            }
+          }
+        }
+      };
+    
+      const observer = new MutationObserver(callback);
+      observer.observe(targetNode, config);
     }
-
     // Start execution in the ChatGPT tab
     pasteTextAndSend(text, senderId);
 }
