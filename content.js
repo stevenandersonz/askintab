@@ -134,6 +134,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log("Received AI response:", message.text);
       insertResponseBelowSelection(message.text);
   }
+  if (message.type === "LLM_RESPONSE") {
+    console.log("Received AI response:", message.text);
+    //insertResponseBelowSelection(message.text);
+}
 });
 
 // Function to append AI response below the selected text

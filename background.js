@@ -1,16 +1,15 @@
 const LLMSETUP = {
   chatgpt: {
     btnSend: 'button[data-testid="send-button"]',
-    textArea: '#prompt-textarea'
+    textArea: '#prompt-textarea',
+    responseStartsWith: "ChatGPTDOM"
   }
 } 
 const LLM = "chatgpt"
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "NEW_NODE") {
-    console.log(message)
-  }
-  if (message.type === "STREAMING_RESPONSE") {
-    console.log(message.data)
+  if (message.type === "LLM_RESPONSE") {
+    console.log(message.text)
+    chrome.tabs.sendMessage(message.targetId, { type: "LLM_RESPONSE", text: message.text })
   }
   if (message.type === "PROMPT_SENT") {
     console.log("PROMPT was sent to llm")
@@ -88,17 +87,14 @@ function injectFunctions(text, senderId, UI) {
             mutation.addedNodes.forEach(node => {
               if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
                 const text = node.textContent.trim();
-                if (text) {
-                  chrome.runtime.sendMessage({ type: "NEW_NODE", text, from:"childlist" });
+                console.log(text)
+                if (text.startsWith(UI.responseStartsWith)) {
+                  console.log("SENDING TEXT to BG")
+                  chrome.runtime.sendMessage({ type: "LLM_RESPONSE", text, targetId: senderId });
                 }
               }
             });
-          } else if (mutation.type === 'characterData') {
-            const text = mutation.target.textContent.trim();
-            if (text) {
-              chrome.runtime.sendMessage({ type: "NEW_NODE", text, from: "characterdata" });
-            }
-          }
+          } 
         }
       };
     
