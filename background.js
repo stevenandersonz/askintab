@@ -2,7 +2,7 @@ const LLMSETUP = {
   chatgpt: {
     btnSend: 'button[data-testid="send-button"]',
     textArea: '#prompt-textarea',
-    responseStartsWith: "ChatGPTDOM"
+    responseStartsWith: "ChatGPT"
   }
 } 
 const LLM = "chatgpt"
@@ -103,4 +103,39 @@ function injectFunctions(text, senderId, UI) {
     }
     // Start execution in the ChatGPT tab
     pasteTextAndSend(text, senderId);
+}
+
+// --- HANDLE Right click over selection and shows ask ai option
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+      id: "annotateText",
+      title: "Annotate Selection",
+      contexts: ["selection"] // Ensures it only appears when text is selected
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "annotateText" && info.selectionText) {
+      chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          function: annotateSelection,
+          args: [info.selectionText]
+      });
+  }
+});
+
+function annotateSelection(selectedText) {
+  const EXT_NAME = "companion"
+  let selection = window.getSelection();
+  if (!selection.rangeCount) return;
+
+  let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
+  let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
+  let selectionSpan = document.querySelector(`.${EXT_NAME}-pending`)
+  if(prompterContainer){
+    selectionSpan.classList.add(EXT_NAME + "-selection-effect")
+    prompterContainer.style.display = "block"
+    prompterInput.focus()
+  }
+  // Perform the annotation action
 }

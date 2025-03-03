@@ -1,168 +1,144 @@
-let selectedText = '';
-let selectionRange = null;
+const EXT_NAME = "companion"
+// Create the UI container (keeping the existing textarea and upload button)
+const uiContainer = document.createElement('div');
+uiContainer.className = EXT_NAME + '-container';
+uiContainer.innerHTML = `
+    <textarea id="prompter" class="${EXT_NAME}-textarea" placeholder="What do you want to know?"></textarea>
+    <button id="ask-btn" class="${EXT_NAME}-upload-button">Upload</button>
+`;
 
-// Remove existing tooltip or prompter if present
-function removeExistingElements() {
-  const existingTooltip = document.getElementById('ask-tooltip');
-  const existingPrompter = document.getElementById('question-prompter');
-  if (existingTooltip) {
-    console.log("Removing existing tooltip");
-    existingTooltip.remove();
+// Append the UI to the body and position it at the bottom
+uiContainer.style.position = 'fixed';
+uiContainer.style.bottom = '20px';
+uiContainer.style.left = '50%';
+uiContainer.style.transform = 'translateX(-50%)';
+uiContainer.style.zIndex = '1000';
+uiContainer.style.display = 'none';
+document.body.appendChild(uiContainer);
+
+// Variables for selection, position, and annotations
+let selectionPosition = { x: 0, y: 0 };
+let annotationCounter = 0; // Track the number of annotations
+const annotations = new Map(); // Map to store annotations and their linked <p> nodes
+
+document.addEventListener("keydown", function (event) {
+  if (event.ctrlKey && event.key === "k") {
+      event.preventDefault(); // Prevents default browser behavior (like search or hyperlink focus)
+      console.log("Hello");
   }
-  if (existingPrompter) {
-    console.log("Removing existing prompter");
-    existingPrompter.remove();
+});
+
+btn = document.querySelector("#ask-btn")
+btn.addEventListener('click', function () {
+  let ctx = document.querySelector("span." + EXT_NAME + "-pending");
+  let annotations = document.querySelectorAll("a." + EXT_NAME + "-annotation-link") || [];
+  this.parentNode.style.display = "none";
+
+  if (ctx) {
+      // Finalize the annotation
+      ctx.className = `${EXT_NAME}-annotation-context ${EXT_NAME}-has-annotation`;
+
+      // Create a spinner element
+      let spinner = document.createElement("span");
+      spinner.className = EXT_NAME + "-annotation-spinner";
+      spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)
+
+      // Append the spinner inside the annotation span
+      ctx.appendChild(document.createTextNode(" ")); // Space before the spinner
+      ctx.appendChild(spinner);
+
+      // Simulate a 1-second delay before replacing the spinner with the annotation link
+      setTimeout(() => {
+          // Create an <a> element with annotation number
+          let annotationLink = document.createElement("a");
+          annotationLink.className = EXT_NAME + "-annotation-link";
+          annotationLink.textContent = `[${annotations.length}]`;
+          annotationLink.href = "#"; // Placeholder, modify as needed
+
+          // Add hover event listeners
+          annotationLink.addEventListener('mouseover', () => {
+              ctx.style.textDecoration = 'underline';
+          });
+
+          annotationLink.addEventListener("click", (e) => {
+              e.preventDefault(); // Prevent default link behavior
+
+              // Check if an annotation box already exists
+              let existingBox = ctx.nextElementSibling;
+              if (existingBox && existingBox.classList.contains(EXT_NAME + "-annotation-box")) {
+                  existingBox.classList.toggle("hidden"); // Toggle visibility
+                  return;
+              }
+
+              // Create annotation box
+              let annotationBox = document.createElement("div");
+              annotationBox.className = EXT_NAME + "-annotation-box";
+
+              // Create dummy content
+              let annotationText = document.createElement("p");
+              annotationText.className = EXT_NAME + "annotation-text";
+              annotationText.textContent = "This is a dummy annotation text. Replace it with actual content.";
+
+              // Append elements
+              annotationBox.appendChild(annotationText);
+
+              // Insert the annotation box after the span
+              ctx.parentNode.insertBefore(annotationBox, ctx.nextSibling);
+          });
+
+          annotationLink.addEventListener('mouseout', () => {
+              ctx.style.textDecoration = 'none';
+          });
+
+          // Replace spinner with annotation link
+          ctx.replaceChild(annotationLink, spinner);
+
+      }, 1000); // 1-second delay before replacing spinner with annotation link
   }
-}
+});
 
-// Show tooltip near the selection
-function showTooltip() {
-  removeExistingElements();
-
+// Handle text selection on mouseup
+document.addEventListener('mouseup', (e) => {
   const selection = window.getSelection();
-  if (!selection.rangeCount) {
-    console.log("No selection range available.");
-    return;
+  
+  if (selection.rangeCount > 0) {
+    let range = selection.getRangeAt(0)
+    let span = document.createElement("span");
+    span.className = EXT_NAME + "-pending";
+
+    // Extract the selected content and append it to the span
+    let extractedContents = range.extractContents();
+    span.appendChild(extractedContents);
+
+    // Insert the span back into the document
+    range.insertNode(span);
   }
-
-  selectedText = selection.toString().trim();
-  selectionRange = selection.getRangeAt(0).cloneRange(); // Preserve selection
-
-  if (!selectedText) {
-    console.log("Selection text is empty.");
-    return;
-  }
-
-  const rangeRect = selectionRange.getBoundingClientRect();
-  const tooltip = document.createElement('div');
-  tooltip.id = 'ask-tooltip';
-  tooltip.textContent = 'Ask Question';
-  tooltip.style.position = 'absolute';
-  tooltip.style.left = `${rangeRect.left + window.scrollX}px`;
-  tooltip.style.top = `${rangeRect.bottom + window.scrollY + 5}px`;
-  tooltip.style.backgroundColor = '#333';
-  tooltip.style.color = '#fff';
-  tooltip.style.padding = '5px 10px';
-  tooltip.style.borderRadius = '3px';
-  tooltip.style.cursor = 'pointer';
-  tooltip.style.zIndex = '10000';
-  tooltip.style.userSelect = 'none';
-  document.body.appendChild(tooltip);
-
-  console.log("Tooltip added at", tooltip.style.left, tooltip.style.top);
-
-  tooltip.addEventListener('click', () => {
-    console.log('Tooltip clicked, showing prompter');
-    showPrompter();
-  });
-}
-
-// Show prompter at the bottom of the screen
-function showPrompter() {
-  console.log('showPrompter called');
-  removeExistingElements();
-
-  const prompter = document.createElement('div');
-  prompter.id = 'question-prompter';
-  prompter.innerHTML = `
-    <textarea id="prompt-input" placeholder="Enter your prompt..."></textarea>
-    <button id="send-prompt">Send</button>
-    <button id="close-prompter">Close</button>
-  `;
-  prompter.style.position = 'fixed';
-  prompter.style.bottom = '0';
-  prompter.style.left = '0';
-  prompter.style.width = '100%';
-  prompter.style.backgroundColor = '#f0f0f0';
-  prompter.style.padding = '10px';
-  prompter.style.boxSizing = 'border-box';
-  prompter.style.zIndex = '10000';
-  prompter.style.display = 'flex';
-  prompter.style.gap = '10px';
-  document.body.appendChild(prompter);
-
-  const textarea = document.getElementById('prompt-input');
-  textarea.style.width = '70%';
-  textarea.style.height = '60px';
-  textarea.style.resize = 'none';
-
-  document.getElementById('send-prompt').addEventListener('click', () => {
-    const prompt = textarea.value.trim();
-    if (prompt && selectedText) {
-      const combinedText = `${prompt}\n${selectedText}`;
-      console.log('Sending combined text:', combinedText);
-      if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage({
-          type: "ASK_QUESTION",
-          text: combinedText
-        });
-      }
-      removeExistingElements();
-    }
-  });
-
-  document.getElementById('close-prompter').addEventListener('click', () => {
-    console.log('Closing prompter');
-    removeExistingElements();
-  });
-}
-
-// Capture selection and show tooltip, but do nothing if the prompter is already open
-function captureSelection() {
-  if (document.getElementById('question-prompter')) return;
-  const selectionText = window.getSelection().toString().trim();
-  if (selectionText) {
-    console.log('Selection captured:', selectionText);
-    showTooltip();
-  } else {
-    removeExistingElements();
-  }
-}
-
-// Listen for selection changes
-document.addEventListener('mouseup', () => {
-  setTimeout(captureSelection, 0);
-});
-document.addEventListener('keyup', captureSelection);
-document.addEventListener('selectionchange', () => {
-  setTimeout(captureSelection, 0);
 });
 
-// Handle AI response and insert it below selection
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "RETURN_RESPONSE") {
-      console.log("Received AI response:", message.text);
-      insertResponseBelowSelection(message.text);
-  }
-  if (message.type === "LLM_RESPONSE") {
-    console.log("Received AI response:", message.text);
-    //insertResponseBelowSelection(message.text);
-}
+
+
+
+// Ensure annotations stay within viewport on scroll and resize
+window.addEventListener('scroll', () => {
+    annotations.forEach((_, id) => {
+        const annotation = document.querySelector(`.${EXT_NAME}-annotation[data-annotation-id="${id}"]`);
+        if (annotation) {
+            const rect = annotation.getBoundingClientRect();
+            if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                annotation.style.top = `${parseInt(annotation.style.top) - window.scrollY}px`;
+            }
+        }
+    });
 });
 
-// Function to append AI response below the selected text
-function insertResponseBelowSelection(responseText) {
-  if (!selectionRange) {
-    console.log("No selection range available to insert response.");
-    return;
-  }
-
-  const responseNode = document.createElement("p");
-  responseNode.textContent = "AI Response: " + responseText;
-  responseNode.style.backgroundColor = "#f0f0f0";
-  responseNode.style.padding = "10px";
-  responseNode.style.border = "1px solid #ccc";
-  responseNode.style.marginTop = "10px";
-
-  const parentNode = selectionRange.commonAncestorContainer;
-
-  if (parentNode.nodeType === Node.TEXT_NODE) {
-    // If selected inside a text node, insert after its parent
-    parentNode.parentNode.insertAdjacentElement('afterend', responseNode);
-  } else {
-    // If selected inside an element, insert directly below it
-    parentNode.insertAdjacentElement('afterend', responseNode);
-  }
-
-  console.log("Response inserted below selection.");
-}
+window.addEventListener('resize', () => {
+    annotations.forEach((_, id) => {
+        const annotation = document.querySelector(`.${EXT_NAME}-annotation[data-annotation-id="${id}"]`);
+        if (annotation) {
+            const rect = annotation.getBoundingClientRect();
+            if (rect.left < 0 || rect.right > window.innerWidth) {
+                annotation.style.left = `${parseInt(annotation.style.left) - (rect.right - window.innerWidth) - 10}px`;
+            }
+        }
+    });
+});

@@ -6,7 +6,7 @@
     "tabs",
     "scripting",
     "activeTab",
-    "debugger"
+  "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -18,8 +18,9 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"], 
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "css": ["styles.css"],
+      "js": ["content.js","marked.min.js"],
+      "run_at": "document_end"
     }
   ]
 }
