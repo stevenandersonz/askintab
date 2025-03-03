@@ -8,19 +8,12 @@ const LLMSETUP = {
 const LLM = "chatgpt"
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "LLM_RESPONSE") {
-    console.log(message.text)
-    chrome.tabs.sendMessage(message.targetId, { type: "LLM_RESPONSE", text: message.text })
+      console.log("SENDING LLM RESPONSE TO ACTIVE TAB");
+      chrome.tabs.sendMessage(message.targetId, { type: "LLM_RESPONSE", payload: message.text });
   }
-  if (message.type === "PROMPT_SENT") {
-    console.log("PROMPT was sent to llm")
-  }
-  if (message.type === "NEW_NODE") {
-    console.log("NEW NODE")
-    console.log(message.text)
-  }
-  if (message.type === "ASK_QUESTION") {
+  if (message.type === "PROMPT_REQUEST") {
+      console.log("SENDING PROMPT TO LLM")
       const targetDomain = "chatgpt.com"; 
-
       chrome.tabs.query({}, (tabs) => {
           const targetTab = tabs.find(tab => tab.url.includes(targetDomain) && !tab.active);
           console.log(sender);
@@ -28,7 +21,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               chrome.scripting.executeScript({
                   target: { tabId: targetTab.id },
                   func: injectFunctions,
-                  args: [message.text, sender.tab.id, LLMSETUP[LLM]]
+                  args: [message.payload, sender.tab.id, LLMSETUP[LLM]]
               });
               console.log("Sent text to inactive tab:", targetTab.id, targetTab.url);
           } else {
@@ -36,10 +29,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
       });
   }
-    if (message.type === "RETURN_RESPONSE") {
-        console.log("return message heard in background")
-    
-    }
 });
 // Injects both `pasteTextAndSend` and `monitorResponseCompletion`
 function injectFunctions(text, senderId, UI) {
@@ -126,16 +115,28 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 function annotateSelection(selectedText) {
   const EXT_NAME = "companion"
-  let selection = window.getSelection();
-  if (!selection.rangeCount) return;
+  const selection = window.getSelection();
+  
+  if (selection.rangeCount > 0) {
+    let range = selection.getRangeAt(0)
+    let span = document.createElement("span");
+    span.className = EXT_NAME + "-pending";
 
-  let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
-  let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
-  let selectionSpan = document.querySelector(`.${EXT_NAME}-pending`)
-  if(prompterContainer){
-    selectionSpan.classList.add(EXT_NAME + "-selection-effect")
-    prompterContainer.style.display = "block"
-    prompterInput.focus()
+    // Extract the selected content and append it to the span
+    let extractedContents = range.extractContents();
+    span.appendChild(extractedContents);
+
+    // Insert the span back into the document
+    range.insertNode(span);
+
+    let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
+    let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
+    let selectionSpan = document.querySelector(`.${EXT_NAME}-pending`)
+    if(prompterContainer){
+      selectionSpan.classList.add(EXT_NAME + "-selection-effect")
+      prompterContainer.style.display = "block"
+      prompterInput.focus()
+    }
   }
   // Perform the annotation action
 }

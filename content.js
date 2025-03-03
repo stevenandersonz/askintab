@@ -3,8 +3,10 @@ const EXT_NAME = "companion"
 const uiContainer = document.createElement('div');
 uiContainer.className = EXT_NAME + '-container';
 uiContainer.innerHTML = `
-    <textarea id="prompter" class="${EXT_NAME}-textarea" placeholder="What do you want to know?"></textarea>
-    <button id="ask-btn" class="${EXT_NAME}-upload-button">Upload</button>
+  <form id="${EXT_NAME}-prompt">
+    <textarea name="prompter" id="prompter" class="${EXT_NAME}-textarea" placeholder="What do you want to know?"></textarea>
+    <button type="submit" id="ask-btn" class="${EXT_NAME}-upload-button">Upload</button>
+  </form>
 `;
 
 // Append the UI to the body and position it at the bottom
@@ -28,17 +30,17 @@ document.addEventListener("keydown", function (event) {
   }
 });
 
-btn = document.querySelector("#ask-btn")
-btn.addEventListener('click', function () {
+let form = document.querySelector(`#${EXT_NAME}-prompt`)
+form.addEventListener('submit', function (evt) {
+  evt.preventDefault();
+  let formData = new FormData(this); // Collects form data
+  let prompt = formData.get("prompter");
   let ctx = document.querySelector("span." + EXT_NAME + "-pending");
-  let annotations = document.querySelectorAll("a." + EXT_NAME + "-annotation-link") || [];
   this.parentNode.style.display = "none";
 
   if (ctx) {
-      // Finalize the annotation
-      ctx.className = `${EXT_NAME}-annotation-context ${EXT_NAME}-has-annotation`;
-
       // Create a spinner element
+      chrome.runtime.sendMessage({ type: "PROMPT_REQUEST", payload: `${prompt} \n ${ctx.innerText}` })
       let spinner = document.createElement("span");
       spinner.className = EXT_NAME + "-annotation-spinner";
       spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)
@@ -46,99 +48,58 @@ btn.addEventListener('click', function () {
       // Append the spinner inside the annotation span
       ctx.appendChild(document.createTextNode(" ")); // Space before the spinner
       ctx.appendChild(spinner);
-
-      // Simulate a 1-second delay before replacing the spinner with the annotation link
-      setTimeout(() => {
-          // Create an <a> element with annotation number
-          let annotationLink = document.createElement("a");
-          annotationLink.className = EXT_NAME + "-annotation-link";
-          annotationLink.textContent = `[${annotations.length}]`;
-          annotationLink.href = "#"; // Placeholder, modify as needed
-
-          // Add hover event listeners
-          annotationLink.addEventListener('mouseover', () => {
-              ctx.style.textDecoration = 'underline';
-          });
-
-          annotationLink.addEventListener("click", (e) => {
-              e.preventDefault(); // Prevent default link behavior
-
-              // Check if an annotation box already exists
-              let existingBox = ctx.nextElementSibling;
-              if (existingBox && existingBox.classList.contains(EXT_NAME + "-annotation-box")) {
-                  existingBox.classList.toggle("hidden"); // Toggle visibility
-                  return;
-              }
-
-              // Create annotation box
-              let annotationBox = document.createElement("div");
-              annotationBox.className = EXT_NAME + "-annotation-box";
-
-              // Create dummy content
-              let annotationText = document.createElement("p");
-              annotationText.className = EXT_NAME + "annotation-text";
-              annotationText.textContent = "This is a dummy annotation text. Replace it with actual content.";
-
-              // Append elements
-              annotationBox.appendChild(annotationText);
-
-              // Insert the annotation box after the span
-              ctx.parentNode.insertBefore(annotationBox, ctx.nextSibling);
-          });
-
-          annotationLink.addEventListener('mouseout', () => {
-              ctx.style.textDecoration = 'none';
-          });
-
-          // Replace spinner with annotation link
-          ctx.replaceChild(annotationLink, spinner);
-
-      }, 1000); // 1-second delay before replacing spinner with annotation link
+      this.reset()
   }
 });
 
-// Handle text selection on mouseup
-document.addEventListener('mouseup', (e) => {
-  const selection = window.getSelection();
-  
-  if (selection.rangeCount > 0) {
-    let range = selection.getRangeAt(0)
-    let span = document.createElement("span");
-    span.className = EXT_NAME + "-pending";
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "LLM_RESPONSE") {
+    console.log("-----")
+    console.log(request.payload)
+    console.log("-----")
+    if(typeof request.payload !== 'string') return
+    if(!request.payload.startsWith("ChatGPTNew") && !request.payload.startsWith("ChatGPT says") ) return
+    let spinner = document.querySelector(`.${EXT_NAME}-annotation-spinner`)
+    if(!spinner) return
+    let annotations = document.querySelectorAll("a." + EXT_NAME + "-annotation-link") || [];
+    let ctx = document.querySelector("span." + EXT_NAME + "-pending");
+    ctx.className = `${EXT_NAME}-annotation-context ${EXT_NAME}-has-annotation`;
 
-    // Extract the selected content and append it to the span
-    let extractedContents = range.extractContents();
-    span.appendChild(extractedContents);
+    // Create an <a> element with annotation number
+    let annotationLink = document.createElement("a");
+    annotationLink.className = EXT_NAME + "-annotation-link";
+    annotationLink.textContent = `[${annotations.length}]`;
+    annotationLink.href = "#"; // Placeholder, modify as needed
 
-    // Insert the span back into the document
-    range.insertNode(span);
+    ctx.replaceChild(annotationLink, spinner); 
+    // Add hover event listeners
+    annotationLink.addEventListener('mouseover', () => {
+        ctx.style.textDecoration = 'underline';
+    });
+
+    annotationLink.addEventListener("click", (e) => {
+      e.preventDefault(); // Prevent default link behavior
+
+      // Check if an annotation box already exists
+      let existingBox = ctx.nextElementSibling;
+      if (existingBox && existingBox.classList.contains(`${EXT_NAME}-annotation-box`)) {
+          existingBox.classList.toggle("hidden"); // Toggle visibility
+          return;
+      }
+
+      // Create annotation box
+      let annotationBox = document.createElement("div");
+      annotationBox.className = `${EXT_NAME}-annotation-box`
+
+      // Create dummy content
+      annotationBox.innerHTML = marked.parse(request.payload);
+
+      // Insert the annotation box after the span
+      ctx.parentNode.insertBefore(annotationBox, ctx.nextSibling);
+    });
+
+    annotationLink.addEventListener('mouseout', () => {
+        ctx.style.textDecoration = 'none';
+    });
   }
-});
-
-
-
-
-// Ensure annotations stay within viewport on scroll and resize
-window.addEventListener('scroll', () => {
-    annotations.forEach((_, id) => {
-        const annotation = document.querySelector(`.${EXT_NAME}-annotation[data-annotation-id="${id}"]`);
-        if (annotation) {
-            const rect = annotation.getBoundingClientRect();
-            if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                annotation.style.top = `${parseInt(annotation.style.top) - window.scrollY}px`;
-            }
-        }
-    });
-});
-
-window.addEventListener('resize', () => {
-    annotations.forEach((_, id) => {
-        const annotation = document.querySelector(`.${EXT_NAME}-annotation[data-annotation-id="${id}"]`);
-        if (annotation) {
-            const rect = annotation.getBoundingClientRect();
-            if (rect.left < 0 || rect.right > window.innerWidth) {
-                annotation.style.left = `${parseInt(annotation.style.left) - (rect.right - window.innerWidth) - 10}px`;
-            }
-        }
-    });
 });
