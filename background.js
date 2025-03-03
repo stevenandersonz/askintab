@@ -2,10 +2,16 @@ const LLMSETUP = {
   chatgpt: {
     btnSend: 'button[data-testid="send-button"]',
     textArea: '#prompt-textarea',
+    responseStartsWith: "ChatGPT",
+  },
+  grok: {
+    domain: "grok.com",
+    btnSend: 'form button[type="submit"]:not(#companion-btn)',
+    textArea: 'form textarea:not(#companion-textarea)',
     responseStartsWith: "ChatGPT"
   }
 } 
-const LLM = "chatgpt"
+const LLM = "grok"
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "LLM_RESPONSE") {
       console.log("SENDING LLM RESPONSE TO ACTIVE TAB");
@@ -13,9 +19,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === "PROMPT_REQUEST") {
       console.log("SENDING PROMPT TO LLM")
-      const targetDomain = "chatgpt.com"; 
       chrome.tabs.query({}, (tabs) => {
-          const targetTab = tabs.find(tab => tab.url.includes(targetDomain) && !tab.active);
+          const targetTab = tabs.find(tab => tab.url.includes(LLMSETUP[LLM].domain) && !tab.active);
           console.log(sender);
           if (targetTab) {
               chrome.scripting.executeScript({
@@ -34,9 +39,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function injectFunctions(text, senderId, UI) {
     function pasteTextAndSend(text, senderId) {
         console.log("Pasting text into the textarea...");
-
         observeConversation()
-        const textarea = document.querySelector(UI.textArea);
+        const textarea = document.querySelector(UI.textArea)
+        console.log(textarea)
         if (!textarea) {
             console.log("Textarea not found.");
             return;
@@ -48,6 +53,7 @@ function injectFunctions(text, senderId, UI) {
 
         function findAndClickButton(retries = 5) {
             const sendButton = document.querySelector(UI.btnSend);
+            console.log(sendButton)
             if (sendButton) {
                 console.log("Clicking the send button...");
                 sendButton.click();

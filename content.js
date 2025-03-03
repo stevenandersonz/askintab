@@ -4,8 +4,8 @@ const uiContainer = document.createElement('div');
 uiContainer.className = EXT_NAME + '-container';
 uiContainer.innerHTML = `
   <form id="${EXT_NAME}-prompt">
-    <textarea name="prompter" id="prompter" class="${EXT_NAME}-textarea" placeholder="What do you want to know?"></textarea>
-    <button type="submit" id="ask-btn" class="${EXT_NAME}-upload-button">Upload</button>
+    <textarea name="prompter" id="${EXT_NAME}-textarea" class="${EXT_NAME}-textarea" placeholder="What do you want to know?"></textarea>
+    <button type="submit" id="${EXT_NAME}-btn" class="${EXT_NAME}-upload-button">Upload</button>
   </form>
 `;
 
@@ -33,6 +33,7 @@ document.addEventListener("keydown", function (event) {
 let form = document.querySelector(`#${EXT_NAME}-prompt`)
 form.addEventListener('submit', function (evt) {
   evt.preventDefault();
+  chrome.runtime.sendMessage({ type: "simulateInput" })
   let formData = new FormData(this); // Collects form data
   let prompt = formData.get("prompter");
   let ctx = document.querySelector("span." + EXT_NAME + "-pending");
@@ -40,15 +41,15 @@ form.addEventListener('submit', function (evt) {
 
   if (ctx) {
       // Create a spinner element
-      chrome.runtime.sendMessage({ type: "PROMPT_REQUEST", payload: `${prompt} \n ${ctx.innerText}` })
-      let spinner = document.createElement("span");
-      spinner.className = EXT_NAME + "-annotation-spinner";
-      spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)
+      //chrome.runtime.sendMessage({ type: "PROMPT_REQUEST", payload: `${prompt} \n ${ctx.innerText}` })
+      // let spinner = document.createElement("span");
+      // spinner.className = EXT_NAME + "-annotation-spinner";
+      // spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)
 
-      // Append the spinner inside the annotation span
-      ctx.appendChild(document.createTextNode(" ")); // Space before the spinner
-      ctx.appendChild(spinner);
-      this.reset()
+      // // Append the spinner inside the annotation span
+      // ctx.appendChild(document.createTextNode(" ")); // Space before the spinner
+      // ctx.appendChild(spinner);
+      // this.reset()
   }
 });
 
