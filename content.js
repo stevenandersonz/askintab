@@ -40,8 +40,8 @@ form.addEventListener('submit', function (evt) {
 
   if (ctx) {
       // Create a spinner element
-      chrome.runtime.sendMessage({ type: "PROMPT_REQUEST",  })
-    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt:`${prompt} \n ${ctx.innerText}`, llm: "grok"} })
+      //chrome.runtime.sendMessage({ type: "PROMPT_REQUEST",  })
+    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt:`${prompt} \n ${ctx.innerText}`, llm: "chatgpt"} })
     let spinner = document.createElement("span");
     spinner.className = EXT_NAME + "-annotation-spinner";
     spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)
@@ -58,8 +58,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("-----")
     console.log(request.payload)
     console.log("-----")
-    if(typeof request.payload !== 'string') return
-    if(!request.payload.startsWith("ChatGPTNew") && !request.payload.startsWith("ChatGPT says") ) return
+    if(typeof request.payload.data !== 'string') return
     let spinner = document.querySelector(`.${EXT_NAME}-annotation-spinner`)
     if(!spinner) return
     let annotations = document.querySelectorAll("a." + EXT_NAME + "-annotation-link") || [];
@@ -93,7 +92,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       annotationBox.className = `${EXT_NAME}-annotation-box`
 
       // Create dummy content
-      annotationBox.innerHTML = marked.parse(request.payload);
+      annotationBox.innerHTML = marked.parse(request.payload.data);
 
       // Insert the annotation box after the span
       ctx.parentNode.insertBefore(annotationBox, ctx.nextSibling);
