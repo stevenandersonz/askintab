@@ -41,7 +41,7 @@ form.addEventListener('submit', function (evt) {
   if (ctx) {
       // Create a spinner element
       //chrome.runtime.sendMessage({ type: "PROMPT_REQUEST",  })
-    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt:`${prompt} \n ${ctx.innerText}`, llm: "chatgpt"} })
+    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt:`${prompt} \n ${ctx.innerText}`, llm: "grok"} })
     let spinner = document.createElement("span");
     spinner.className = EXT_NAME + "-annotation-spinner";
     spinner.innerHTML = "⏳"; // Placeholder spinner icon (can be replaced with a proper CSS spinner)

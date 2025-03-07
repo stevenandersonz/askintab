@@ -297,29 +297,103 @@ data: {"type": "conversation_detail_metadata", "banner_info": null, "blocked_fea
 
 data: [DONE]`
 
+// console.log(JSON.parse('{"v": ".\\"\\n-"}'))
+// return
+// const t2 = `event: delta
+// data: {"v": " interests of creator\ns, consumers"}`
 
-const t1 = `
-event: delta
-data: {"v": " a key distinction:\n\n"}`;
+// console.log(t2.replaceAll("\n", "\\n"))
+// console.log(t2.replaceAll("\n", "\\n").split("\n"))
 
-// Split and clean the string
-const lines = t1.trim().split('\n');
-const event = lines[0].replace('event: ', '');
-const dataStr = lines[1].replace('data: ', '');
+// return
+// const t1 = '{"v": " a key distinction:\n\n"}';
+// console.log(JSON.parse(t1.replaceAll("\n", "\\n")))
+// return
 
-try {
-    // Parse the JSON
-    const parsedData = JSON.parse(dataStr);
-    console.log("Event:", event);
-    console.log("Parsed JSON:", parsedData);
-    console.log("Value:", parsedData.v);
-} catch (e) {
-    console.error("JSON parsing error:", e.message);
-    console.log("Raw data string:", dataStr);
+function splitByNewlineOutsideQuotes(input) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    
+    if (char === '"' && (i === 0 || input[i - 1] !== '\\')) {
+      inQuotes = !inQuotes;
+    }
+    
+    if (char === "\n" && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  if (current) result.push(current);
+  return result;
 }
 
-//processedEvents = parseDelta(t1)
-//console.log(processedEvents)
+const formattedText = splitByNewlineOutsideQuotes(t)
+//formattedText.forEach(e => console.log(e))
+function escapeJsonStrings(json) {
+  return json.replace(/"(?:\\.|[^"\\])*"/g, (match) => {
+    // Remove surrounding quotes
+    const inner = match.slice(1, -1);
+    // Replace actual newline characters and unescaped double quotes
+    const escapedInner = inner
+      .replace(/\n/g, '\\n')
+      .replace(/(?<!\\)"/g, '\\"');
+    return `"${escapedInner}"`;
+  });
+}
+function fixJsonString(jsonStr) {
+  let result = '';
+  let inString = false;
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+    if (char === '"') {
+      if (!inString) {
+        inString = true;
+        result += char;
+      } else {
+        // If already escaped, leave it
+        if (jsonStr[i - 1] === '\\') {
+          result += char;
+        } else {
+          // Peek ahead to decide if this is a closing quote.
+          const nextChar = jsonStr[i + 1];
+          if (nextChar && ![',', '}', ' ', '\n', '\t'].includes(nextChar)) {
+            result += '\\"';
+          } else {
+            inString = false;
+            result += char;
+          }
+        }
+      }
+    } else {
+      result += char;
+    }
+  }
+  return result;
+}
+
+let events = []
+let e = {event: null, data: null}
+for (let l of formattedText.filter(l => l !== "")){
+  if(l.startsWith("event:")){
+    e.event = l.split(":")[1].trim()
+  }
+  if(l.startsWith("data:")){
+    let data = l.slice(6)
+    console.log(escapeJsonStrings(data))
+    if(data === "[DONE]") continue
+    e.data = JSON.parse(fixJsonString(escapeJsonStrings(data)))
+    events.push(e)    
+    e = {event: null, data: null}
+  }
+}
+console.log(events)
+
 return
 
 let messageParts = [""];
@@ -348,4 +422,4 @@ processedEvents.forEach(event => {
   }
 });
 
-//console.log(messageParts[0]);
+console.log(messageParts[0]);
