@@ -1,16 +1,22 @@
 const LLMSETUP = {
   chatgpt: {
+    // when answering it goes:
+    // result-thinking -> result-streaming
+    // result-streaming -> 
+
     selectors: {
       send:'button[data-testid="send-button"]',
       write:'#prompt-textarea',
       title: "div[title]"
     },
-    watchFor: "https://chatgpt.com/backend-api/conversation",
     present: false,
     tabId: null,
     domain: "chatgpt.com",
-    useMutationObserver: true,
-    watchFor: "ChatGPT"
+    mutationObserverConfig: {
+      //const: "ChatGPT"
+      //selector: + document.querySelector("div[title]").title' // CHATGPT prepend the final response with "ChatGPT" + title of the chat 
+    },
+
   },
   grok: {
     domain: "grok.com",
@@ -19,15 +25,16 @@ const LLMSETUP = {
       send:'form button[type="submit"]:not(#companion-btn)',
       write:'form textarea:not(#companion-textarea)',
     },
-    useMutationObserver: false,
     useNetworkDebugger: true,
-    watchFor: "https://grok.com/rest/app-chat/conversations",
-    dataParser: (d) => {
-      d = d.split('\n')
-      d = JSON.parse(d[d.length-2]) // final result comes here, prev items are tokens streamed
-      //TODO: validate response
-      console.log(`Parsed response ${JSON.stringify(d)}`)
-      return d.result.modelResponse.message
+    networkDebuggerConfig: {
+      watchFor: "https://grok.com/rest/app-chat/conversations",
+      onResponse: (d) => {
+        d = d.split('\n')
+        d = JSON.parse(d[d.length-2]) // final result comes here, prev items are tokens streamed
+        //TODO: validate response
+        console.log(`Parsed response ${JSON.stringify(d)}`)
+        return d.result.modelResponse.message
+      }
     },
     present: false,
     tabId: null
@@ -56,7 +63,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     const { prompt, llm } = payload
     if (!LLMSETUP[llm].present && !LLMSETUP[llm].tabId) return  
     if (debuggerAttached) return
-    const {tabId, selectors, useMutationObserver, useNetworkDebugger, watchFor} = LLMSETUP[llm]
+    const {tabId, networkDebuggerConfig, mutationObserverConfig} = LLMSETUP[llm]
     activeLLM = llm
     senderId = sender.tab.id
     console.log(`SENDING REQUEST from tab ${senderId} TO ${llm} at tab id: ${tabId}`)
@@ -64,7 +71,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     chrome.debugger.attach({ tabId }, "1.3", function() {
       console.log(`Attaching debugger to for request at tab id: ${tabId}`)
       debuggerAttached = true
-      if(useNetworkDebugger){
+      if(networkDebuggerConfig){
         console.log(`Using Network debugger at tab id: ${tabId}`)
         // Enable Network domain to watch for net request made through the llm
         chrome.debugger.sendCommand(
@@ -73,21 +80,18 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
           {},
           // as soon as we watch the network make llm specific request
           function() {
-            chrome.scripting.executeScript({
-              target: { tabId },
-              func: selectPrompter,
-              args: [selectors]
-            }, () => onPrompterSelected(tabId, prompt, selectors));
+            handlePrompt(prompt)
           }
         );
       } 
-      if(useMutationObserver){
+      if(mutationObserverConfig){
         console.log(`Using MutationObserver at tab id: ${tabId}`)
-        chrome.scripting.executeScript({
-          target: { tabId },
-          func: selectPrompter,
-          args: [selectors]
-        }, () => onPrompterSelected(tabId, prompt, selectors, useMutationObserver, senderId, watchFor));
+        // chrome.scripting.executeScript({
+        //   target: { tabId },
+        //   func: selectPrompter,
+        //   args: [selectors]
+        // }, () => onPrompterSelected(tabId, prompt, selectors, useMutationObserver, senderId, watchFor));
+        handlePrompt(prompt)
       }
       
 
@@ -99,24 +103,80 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   }
 });
 
+function handlePrompt(prompt){
+  const {selectors, tabId, mutationObserverConfig} = LLMSETUP[activeLLM] 
+  // executeScript sents func and executes it into the tab web context
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: function (selectors) {
+      let textArea = document.querySelector(selectors.write);
+      if (textArea){
+        console.log(`Found selector ${selectors.write}`)
+        textArea.focus();
+      } 
+    },
+    args: [selectors]},
+    // this callback is executed after func in the serviceWorker context
+    async () => {
+      // debugger.command is needed since llm like grok checks for event.isTrusted === true
+      await new Promise(resolve => 
+        chrome.debugger.sendCommand(
+          { tabId },
+          "Input.insertText",
+          { text: prompt },
+          resolve
+        )
+      );
+
+      chrome.scripting.executeScript({
+        target: { tabId },
+        args: [selectors, mutationObserverConfig ? mutationObserverConfig : false],
+        func: function(selectors, mutationObserverConfig) {
+          let btnSend = document.querySelector(selectors.send);
+          if (btnSend){
+            if (mutationObserverConfig){
+              // Observe the mutations on the DOM, and return the text if match watchFor
+              const observer = new MutationObserver(function(mutationsList) {
+                for (const mutation of mutationsList) {
+                  if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                      if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
+                        let watchFor = "ChatGPT" + document.title
+                        if (node.textContent.trim().startsWith(watchFor)) {
+                          console.log("Found Match, sending response")
+                          chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
+                          // //observer.disconnect()
+                        }
+                      }
+                    });
+                  }
+                }
+              });
+              observer.observe(document.body, { childList: true, subtree: true, characterData: true});
+            }
+            btnSend.click();
+            console.log(`Selector ${selectors.write} clicked`)
+          } 
+        }
+      }, function() {
+        chrome.debugger.detach({ tabId }) 
+      });
+    }
+  );
+}
 
 let targetRequestId = null;
 chrome.debugger.onEvent.addListener(function (source, method, params) {
+  const {watchFor, onResponse} = LLMSETUP[activeLLM].networkDebuggerConfig
   // Step 1: Catch the response and store the requestId
   if (method === "Network.responseReceived") {
-    if (params.response.url.startsWith(LLMSETUP[activeLLM].watchFor)) {
+    if (params.response.url.startsWith(watchFor))
+      console.log(`response received from: ${watchFor}`)
       targetRequestId = params.requestId; // Save the requestId
-      // Check for streaming indicators
-      const transferEncoding = params.response.headers["Transfer-Encoding"];
-      console.log("Is it chunked?", transferEncoding || "No Transfer-Encoding header");
-    }
   }
   // Step 3: Get the body when the response is "finished"
   else if (method === "Network.loadingFinished") {
     if (params.requestId === targetRequestId) {
-      console.log("Loading finished for Request ID:", params.requestId);
-      console.log("Total encoded data length:", params.encodedDataLength);
-
       // Now try to fetch the response body
       chrome.debugger.sendCommand(
         { tabId: source.tabId },
@@ -126,9 +186,9 @@ chrome.debugger.onEvent.addListener(function (source, method, params) {
           if (chrome.runtime.lastError) {
             console.error("Error getting response body:", chrome.runtime.lastError.message);
           } else if (response) {
-            console.log(response)
             if(typeof response.body !== 'string') return
-            chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: LLMSETUP[activeLLM].dataParser(response.body)});
+            console.log(`Sending body content to tab: ${senderId}`)
+            chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: onResponse(response.body)});
             chrome.debugger.detach({ tabId: LLMSETUP[activeLLM].tabId });
             activeLLM=null
             senderId=null
@@ -138,80 +198,6 @@ chrome.debugger.onEvent.addListener(function (source, method, params) {
     }
   }
 });
-
-function selectPrompter(selectors) {
-  var textArea = document.querySelector(selectors.write);
-  if (textArea){
-    console.log(`Found selector ${selectors.write}`)
-    textArea.focus();
-  } 
-}
-
-async function onPrompterSelected(tabId, prompt, selectors, useMutationObserver=false, senderId="", watchFor="") {
-  if (chrome.runtime.lastError) {
-    console.error(chrome.runtime.lastError);
-    chrome.debugger.detach({ tabId: tabId });
-    debuggerAttached=false
-    sendResponse({ success: false });
-    return;
-  }
-  console.log(prompt)
-  // we need the debugger because -> grok checks event.isTrusted - chatgpt doesnt
-  await new Promise(resolve => 
-    chrome.debugger.sendCommand(
-      { tabId },
-      "Input.insertText",
-      { text: prompt },
-      resolve
-    )
-  );
-  console.log("----")
-  console.log(tabId, prompt, selectors, useMutationObserver, senderId, watchFor)
-  console.log("----")
-  //TODO: I need to clean the params
-  chrome.scripting.executeScript({
-    target: { tabId },
-    args: [selectors, senderId, useMutationObserver, watchFor],
-    func: function(selectors, senderId, useMutationObserver=false, watchFor="") {
-      console.log(`params: id:${senderId}, mo:${useMutationObserver}, WF:${watchFor}`)
-      let btnSend = document.querySelector(selectors.send);
-      if (btnSend){
-        if (useMutationObserver){
-          const targetNode = document.body;
-          const config = { childList: true, subtree: true, characterData: true };
-        
-          const observer = new MutationObserver(function(mutationsList) {
-            for (const mutation of mutationsList) {
-              if (mutation.type === 'childList') {
-                mutation.addedNodes.forEach(node => {
-                  if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
-                    const text = node.textContent.trim();
-                    //todo: title is only for gpt
-                    const title = document.querySelector(selectors.title).title
-                    if (text.startsWith(watchFor+title)) {
-                      console.log("sending " + text.slice((watchFor+title).length))
-                      chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: text.slice((watchFor+title).length) });
-                      chrome.debugger.detach({ tabId: senderId });
-                      observer.disconnect()
-                    }
-                  }
-                });
-              }
-            }
-          });
-          console.log("SEtting observer")
-          observer.observe(targetNode, config);
-        }
-        console.log(`Found selector ${selectors.send}`)
-        btnSend.click();
-        console.log(`Selector ${selectors.write} clicked`)
-      } 
-    }
-  }, function() {
-    // detached debugger was here 
-  });
-}
-
 
 // --- HANDLE Right click over selection and shows ask ai option
 chrome.runtime.onInstalled.addListener(() => {
