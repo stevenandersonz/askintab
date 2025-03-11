@@ -1,3 +1,11 @@
+const annotations = {
+  count: 0,
+  saved: [],
+  lastSaved: null,
+  preprompt: "",
+  selectedText: "",
+}
+
 const LLMSETUP = {
   chatgpt: {
     // when answering it goes:
@@ -61,12 +69,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
     const { prompt, llm } = payload
+
     if (!LLMSETUP[llm].present && !LLMSETUP[llm].tabId) return  
     if (debuggerAttached) return
     const {tabId, networkDebuggerConfig, mutationObserverConfig} = LLMSETUP[llm]
     activeLLM = llm
     senderId = sender.tab.id
     console.log(`SENDING REQUEST from tab ${senderId} TO ${llm} at tab id: ${tabId}`)
+
+    let fullPrompt =`${annotations.preprompt} \n ${prompt} \n  ${annotations.selectedText}`
 
     chrome.debugger.attach({ tabId }, "1.3", function() {
       console.log(`Attaching debugger to for request at tab id: ${tabId}`)
@@ -80,26 +91,37 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
           {},
           // as soon as we watch the network make llm specific request
           function() {
-            handlePrompt(prompt)
+            handlePrompt(fullPrompt)
           }
         );
       } 
       if(mutationObserverConfig){
         console.log(`Using MutationObserver at tab id: ${tabId}`)
-        // chrome.scripting.executeScript({
-        //   target: { tabId },
-        //   func: selectPrompter,
-        //   args: [selectors]
-        // }, () => onPrompterSelected(tabId, prompt, selectors, useMutationObserver, senderId, watchFor));
-        handlePrompt(prompt)
+        handlePrompt(fullPrompt)
       }
-      
-
     });
+
+    annotations.count += 1 
+      let annotation = {
+        count: annotations.count,
+        waitingResponse:true,
+        response: null,
+        submittedAt: Date.now(),
+        responseAt: null,
+        selectedText: annotations.selectedText,
+        prompt,
+        llm,
+      }
+      annotations.saved.push(annotation)
+      annotations.lastSaved = annotation
+      annotations.selectedText = ""
+      sendResponse(annotations.lastSaved); 
   }
   if (type === "LLM_RESPONSE") {
     console.log(`Sending response to tab: ${senderId}}`)
-    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: payload }); 
+    annotations.lastSaved.response = payload
+    annotations.lastSaved.waitingResponse = false
+    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: annotations.lastSaved }); 
   }
 });
 
@@ -145,7 +167,7 @@ function handlePrompt(prompt){
                         if (node.textContent.trim().startsWith(watchFor)) {
                           console.log("Found Match, sending response")
                           chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
-                          // //observer.disconnect()
+                          observer.disconnect()
                         }
                       }
                     });
@@ -159,6 +181,8 @@ function handlePrompt(prompt){
           } 
         }
       }, function() {
+        console.log("Detaching debugger")
+        debuggerAttached = false
         chrome.debugger.detach({ tabId }) 
       });
     }
@@ -210,11 +234,12 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "annotateText" && info.selectionText) {
-      chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          function: annotateSelection,
-          args: [info.selectionText]
-      });
+    annotations.selectedText = info.selectionText
+    chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: annotateSelection,
+        args: [info.selectionText]
+    });
   }
 });
 
@@ -225,20 +250,19 @@ function annotateSelection(selectedText) {
   if (selection.rangeCount > 0) {
     let range = selection.getRangeAt(0)
     let span = document.createElement("span");
-    span.className = EXT_NAME + "-pending";
+    span.className = EXT_NAME + "-selection";
 
-    // Extract the selected content and append it to the span
+    // // Extract the selected content and append it to the span
+    // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
     let extractedContents = range.extractContents();
     span.appendChild(extractedContents);
 
-    // Insert the span back into the document
+    // // Insert the span back into the document
     range.insertNode(span);
 
     let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
     let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
-    let selectionSpan = document.querySelector(`.${EXT_NAME}-pending`)
     if(prompterContainer){
-      selectionSpan.classList.add(EXT_NAME + "-selection-effect")
       prompterContainer.style.display = "block"
       prompterInput.focus()
     }
