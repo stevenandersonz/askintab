@@ -1,3 +1,5 @@
+import {grok} from "./llms/index.js"
+
 const annotations = {
   count: 0,
   saved: [],
@@ -7,13 +9,14 @@ const annotations = {
   save: function(prompt,llm, cb){
     this.count += 1 
     let annotation = {
-      count: annotations.count,
+      count: this.count,
       waitingResponse:true,
       response: null,
       submittedAt: Date.now(),
       responseAt: null,
       selectedText: annotations.selectedText,
       prompt,
+      fullPrompt: `${this.preprompt} \n ${prompt} \n  ${this.selectedText}`,
       llm,
     }
     this.saved.push(annotation)
@@ -41,40 +44,21 @@ const LLMSETUP = {
     mutationObserverConfig: {},
 
   },
-  grok: {
-    domain: "grok.com",
-    selectors: {
-      // TODO: grok doesnt use ids in its forms and since the extension appends a extra form we make sure whe don't select it
-      send:'form button[type="submit"]:not(#companion-btn)',
-      write:'form textarea:not(#companion-textarea)',
-    },
-    useNetworkDebugger: true,
-    networkDebuggerConfig: {
-      watchFor: "https://grok.com/rest/app-chat/conversations",
-      onResponse: (d) => {
-        d = d.split('\n')
-        d = JSON.parse(d[d.length-2]) // final result comes here, prev items are tokens streamed
-        //TODO: validate response
-        console.log(`Parsed response ${JSON.stringify(d)}`)
-        return d.result.modelResponse.message
-      }
-    },
-    present: false,
-    tabId: null
-  }
 } 
 
+const LLMS = {grok:{url:"grok.com", tabId: null, send: grok }, chatgpt: {url:"chatgpt.com", tabId: null}}
 // Check availables LLMS
-for(let llm of Object.keys(LLMSETUP)){
-  const urlPattern = `*://*.${LLMSETUP[llm].domain}/*`;
+for(let LLM of Object.values(LLMS)){
+  const urlPattern = `*://*.${LLM.url}/*`;
   chrome.tabs.query({ url: urlPattern }, function(tabs) {
     if(tabs.length <= 0) return
-    if(tabs.length > 1) console.log(`more than one tab for ${llm} is present`) 
-    console.log(`${llm} is avaible at tab id: ${tabs[0].id}`)
-    LLMSETUP[llm].present = true 
-    LLMSETUP[llm].tabId = tabs[0].id 
+    if(tabs.length > 1) console.log(`more than one tab for ${LLM.url} is present`) 
+    console.log(`${LLM.url} is avaible at tab id: ${tabs[0].id}`)
+    LLM.tabId = tabs[0].id 
   });
 }
+
+console.log(LLMS)
 
 let debuggerAttached = false
 let activeLLM = null
@@ -84,39 +68,34 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
     const { prompt, llm } = payload
-
-    if (!LLMSETUP[llm].present && !LLMSETUP[llm].tabId) return  
-    if (debuggerAttached) return
-    const {tabId, networkDebuggerConfig, mutationObserverConfig} = LLMSETUP[llm]
-    activeLLM = llm
-    senderId = sender.tab.id
-    console.log(`SENDING REQUEST from tab ${senderId} TO ${llm} at tab id: ${tabId}`)
-
-    let fullPrompt =`${annotations.preprompt} \n ${prompt} \n  ${annotations.selectedText}`
-
-    chrome.debugger.attach({ tabId }, "1.3", function() {
-      console.log(`Attaching debugger to for request at tab id: ${tabId}`)
-      debuggerAttached = true
-      if(networkDebuggerConfig){
-        console.log(`Using Network debugger at tab id: ${tabId}`)
-        // Enable Network domain to watch for net request made through the llm
-        chrome.debugger.sendCommand(
-          { tabId },
-          "Network.enable",
-          {},
-          // as soon as we watch the network make llm specific request
-          function() {
-            handlePrompt(fullPrompt)
-          }
-        );
-      } 
-      if(mutationObserverConfig){
-        console.log(`Using MutationObserver at tab id: ${tabId}`)
-        handlePrompt(fullPrompt)
-      }
-    });
+    if (!LLMS[llm].tabId) return  
 
     annotations.save(prompt, llm, sendResponse) 
+    LLMS[llm].send(LLMS[llm].tabId, sender.tab.id, annotations.lastSaved)
+    console.log(`SENDING REQUEST from tab ${sender.tab.id} TO ${llm} at tab id: ${LLMS[llm].tabId}`)
+
+    // chrome.debugger.attach({ tabId }, "1.3", function() {
+    //   console.log(`Attaching debugger to for request at tab id: ${tabId}`)
+    //   debuggerAttached = true
+    //   if(networkDebuggerConfig){
+    //     console.log(`Using Network debugger at tab id: ${tabId}`)
+    //     // Enable Network domain to watch for net request made through the llm
+    //     chrome.debugger.sendCommand(
+    //       { tabId },
+    //       "Network.enable",
+    //       {},
+    //       // as soon as we watch the network make llm specific request
+    //       function() {
+    //         handlePrompt(fullPrompt)
+    //       }
+    //     );
+    //   } 
+    //   if(mutationObserverConfig){
+    //     console.log(`Using MutationObserver at tab id: ${tabId}`)
+    //     handlePrompt(fullPrompt)
+    //   }
+    // });
+
   }
   if (type === "LLM_RESPONSE") {
     console.log(`Sending response to tab: ${senderId}}`)
@@ -126,108 +105,70 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   }
 });
 
-function handlePrompt(prompt){
-  const {selectors, tabId, mutationObserverConfig} = LLMSETUP[activeLLM] 
-  // executeScript sents func and executes it into the tab web context
-  chrome.scripting.executeScript({
-    target: { tabId },
-    func: function (selectors) {
-      let textArea = document.querySelector(selectors.write);
-      if (textArea){
-        console.log(`Found selector ${selectors.write}`)
-        textArea.focus();
-      } 
-    },
-    args: [selectors]},
-    // this callback is executed after func in the serviceWorker context
-    async () => {
-      // debugger.command is needed since llm like grok checks for event.isTrusted === true
-      await new Promise(resolve => 
-        chrome.debugger.sendCommand(
-          { tabId },
-          "Input.insertText",
-          { text: prompt },
-          resolve
-        )
-      );
+// function handlePrompt(prompt){
+//   const {selectors, tabId, mutationObserverConfig} = LLMSETUP[activeLLM] 
+//   // executeScript sents func and executes it into the tab web context
+//   chrome.scripting.executeScript({
+//     target: { tabId },
+//     func: function (selectors) {
+//       let textArea = document.querySelector(selectors.write);
+//       if (textArea){
+//         console.log(`Found selector ${selectors.write}`)
+//         textArea.focus();
+//       } 
+//     },
+//     args: [selectors]},
+//     // this callback is executed after func in the serviceWorker context
+//     async () => {
+//       // debugger.command is needed since llm like grok checks for event.isTrusted === true
+//       await new Promise(resolve => 
+//         chrome.debugger.sendCommand(
+//           { tabId },
+//           "Input.insertText",
+//           { text: prompt },
+//           resolve
+//         )
+//       );
 
-      chrome.scripting.executeScript({
-        target: { tabId },
-        args: [selectors, mutationObserverConfig ? mutationObserverConfig : false],
-        func: function(selectors, mutationObserverConfig) {
-          let btnSend = document.querySelector(selectors.send);
-          if (btnSend){
-            if (mutationObserverConfig){
-              // Observe the mutations on the DOM, and return the text if match watchFor
-              const observer = new MutationObserver(function(mutationsList) {
-                for (const mutation of mutationsList) {
-                  if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(node => {
-                      if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
-                        let watchFor = "ChatGPT" + document.title
-                        if (node.textContent.trim().startsWith(watchFor)) {
-                          console.log("Found Match, sending response")
-                          chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
-                          observer.disconnect()
-                        }
-                      }
-                    });
-                  }
-                }
-              });
-              observer.observe(document.body, { childList: true, subtree: true, characterData: true});
-            }
-            btnSend.click();
-            console.log(`Selector ${selectors.write} clicked`)
-          } 
-        }
-      }, function() {
-        console.log("Detaching debugger")
-        if(!mutationObserverConfig) return true
-        debuggerAttached = false
-        chrome.debugger.detach({ tabId }) 
-      });
-    }
-  );
-}
-
-let targetRequestId = null;
-chrome.debugger.onEvent.addListener(function (source, method, params) {
-  const {watchFor, onResponse} = LLMSETUP[activeLLM].networkDebuggerConfig
-  // Step 1: Catch the response and store the requestId
-  if (method === "Network.responseReceived") {
-    if (params.response.url.startsWith(watchFor)){
-      console.log(`response received from: ${watchFor}`)
-      targetRequestId = params.requestId; // Save the requestId
-    }
-  }
-  // Step 3: Get the body when the response is "finished"
-  else if (method === "Network.loadingFinished") {
-    if (params.requestId === targetRequestId) {
-      // Now try to fetch the response body
-      chrome.debugger.sendCommand(
-        { tabId: source.tabId },
-        "Network.getResponseBody",
-        { requestId: targetRequestId },
-        function (response) {
-          if (chrome.runtime.lastError) {
-            console.error("Error getting response body:", chrome.runtime.lastError.message);
-          } else if (response) {
-            if(typeof response.body !== 'string') return
-            console.log(`Sending body content to tab: ${senderId}`)
-            annotations.lastSaved.response = onResponse(response.body) 
-            annotations.lastSaved.waitingResponse = false
-            chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: annotations.lastSaved }); 
-            chrome.debugger.detach({ tabId: LLMSETUP[activeLLM].tabId });
-            debuggerAttached=false
-            activeLLM=null
-            senderId=null
-          }
-        }
-      );
-    }
-  }
-});
+//       chrome.scripting.executeScript({
+//         target: { tabId },
+//         args: [selectors, mutationObserverConfig ? mutationObserverConfig : false],
+//         func: function(selectors, mutationObserverConfig) {
+//           let btnSend = document.querySelector(selectors.send);
+//           if (btnSend){
+//             if (mutationObserverConfig){
+//               // Observe the mutations on the DOM, and return the text if match watchFor
+//               const observer = new MutationObserver(function(mutationsList) {
+//                 for (const mutation of mutationsList) {
+//                   if (mutation.type === 'childList') {
+//                     mutation.addedNodes.forEach(node => {
+//                       if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
+//                         let watchFor = "ChatGPT" + document.title
+//                         if (node.textContent.trim().startsWith(watchFor)) {
+//                           console.log("Found Match, sending response")
+//                           chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
+//                           observer.disconnect()
+//                         }
+//                       }
+//                     });
+//                   }
+//                 }
+//               });
+//               observer.observe(document.body, { childList: true, subtree: true, characterData: true});
+//             }
+//             btnSend.click();
+//             console.log(`Selector ${selectors.write} clicked`)
+//           } 
+//         }
+//       }, function() {
+//         console.log("Detaching debugger")
+//         if(!mutationObserverConfig) return true
+//         debuggerAttached = false
+//         chrome.debugger.detach({ tabId }) 
+//       });
+//     }
+//   );
+// }
 
 // --- HANDLE Right click over selection and shows ask ai option
 chrome.runtime.onInstalled.addListener(() => {
