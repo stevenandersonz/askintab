@@ -56,7 +56,7 @@ form.addEventListener('submit', function (evt) {
   //console.log(selection)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm: "chatgpt"} }, function(annotation){
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm: "grok"} }, function(annotation){
     console.log("-----")
     console.log(annotation)
     console.log("-----")

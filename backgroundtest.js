@@ -4,7 +4,25 @@ const annotations = {
   lastSaved: null,
   preprompt: "",
   selectedText: "",
+  save: function(prompt,llm, cb){
+    this.count += 1 
+    let annotation = {
+      count: annotations.count,
+      waitingResponse:true,
+      response: null,
+      submittedAt: Date.now(),
+      responseAt: null,
+      selectedText: annotations.selectedText,
+      prompt,
+      llm,
+    }
+    this.saved.push(annotation)
+    this.lastSaved = annotation
+    this.selectedText = ""
+    cb(this.lastSaved); 
+  }
 }
+
 
 const LLMSETUP = {
   chatgpt: {
@@ -20,10 +38,7 @@ const LLMSETUP = {
     present: false,
     tabId: null,
     domain: "chatgpt.com",
-    mutationObserverConfig: {
-      //const: "ChatGPT"
-      //selector: + document.querySelector("div[title]").title' // CHATGPT prepend the final response with "ChatGPT" + title of the chat 
-    },
+    mutationObserverConfig: {},
 
   },
   grok: {
@@ -101,21 +116,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       }
     });
 
-    annotations.count += 1 
-      let annotation = {
-        count: annotations.count,
-        waitingResponse:true,
-        response: null,
-        submittedAt: Date.now(),
-        responseAt: null,
-        selectedText: annotations.selectedText,
-        prompt,
-        llm,
-      }
-      annotations.saved.push(annotation)
-      annotations.lastSaved = annotation
-      annotations.selectedText = ""
-      sendResponse(annotations.lastSaved); 
+    annotations.save(prompt, llm, sendResponse) 
   }
   if (type === "LLM_RESPONSE") {
     console.log(`Sending response to tab: ${senderId}}`)
@@ -182,6 +183,7 @@ function handlePrompt(prompt){
         }
       }, function() {
         console.log("Detaching debugger")
+        if(!mutationObserverConfig) return true
         debuggerAttached = false
         chrome.debugger.detach({ tabId }) 
       });
@@ -194,9 +196,10 @@ chrome.debugger.onEvent.addListener(function (source, method, params) {
   const {watchFor, onResponse} = LLMSETUP[activeLLM].networkDebuggerConfig
   // Step 1: Catch the response and store the requestId
   if (method === "Network.responseReceived") {
-    if (params.response.url.startsWith(watchFor))
+    if (params.response.url.startsWith(watchFor)){
       console.log(`response received from: ${watchFor}`)
       targetRequestId = params.requestId; // Save the requestId
+    }
   }
   // Step 3: Get the body when the response is "finished"
   else if (method === "Network.loadingFinished") {
@@ -212,8 +215,11 @@ chrome.debugger.onEvent.addListener(function (source, method, params) {
           } else if (response) {
             if(typeof response.body !== 'string') return
             console.log(`Sending body content to tab: ${senderId}`)
-            chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: onResponse(response.body)});
+            annotations.lastSaved.response = onResponse(response.body) 
+            annotations.lastSaved.waitingResponse = false
+            chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: annotations.lastSaved }); 
             chrome.debugger.detach({ tabId: LLMSETUP[activeLLM].tabId });
+            debuggerAttached=false
             activeLLM=null
             senderId=null
           }
