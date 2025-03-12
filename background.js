@@ -27,7 +27,7 @@ const annotations = {
   }
 }
 
-const LLMS = {grok:{url:"grok.com", tabId: null, send: grok }, chatgpt: {url:"chatgpt.com", tabId: null, send:chatGPT}}
+const LLMS = {grok:{url:"grok.com", tabId: null, send: grok, lastUsed: null }, chatgpt: {url:"chatgpt.com", tabId: null, send:chatGPT, lastUsed:null}}
 // Check availables LLMS
 for(let LLM of Object.values(LLMS)){
   const urlPattern = `*://*.${LLM.url}/*`;
@@ -50,6 +50,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if (!LLMS[llm].tabId) return  
     annotations.save(prompt, llm, sendResponse) 
     senderId = sender.tab.id
+    LLMS[llm].lastUsed = Date.now()
     LLMS[llm].send(LLMS[llm].tabId, senderId, annotations.lastSaved)
     console.log(`SENDING REQUEST from tab ${senderId} TO ${llm} at tab id: ${LLMS[llm].tabId}`)
 
@@ -87,7 +88,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.scripting.executeScript({
         target: { tabId: tab.id },
         function: annotateSelection,
-        args: [Object.keys(LLMS).filter(llm => LLMS[llm].tabId)]
+        args: [Object.keys(LLMS).filter(llm => LLMS[llm].tabId).sort((a,b) => LLMS[b].lastUsed - LLMS[a].lastUsed)]
     });
   }
 });
@@ -111,6 +112,7 @@ function annotateSelection(llms) {
 
     let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
     let llmDropdown = document.querySelector(`.${EXT_NAME}-dropdown`)
+    llmDropdown.innerHTML = ""
     for(let llm of llms){
       let option = document.createElement("option")
       option.value=llm

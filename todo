@@ -2,7 +2,7 @@
 [x] support diagrams
 [] grok stop working 
 [X] problem with new chat in chatgpt 
-[] default last used llm in dropdown 
+[x] default last used llm in dropdown 
 [] support references
 [] add alert for prompt too large
 [] what can we do if prompt too large 

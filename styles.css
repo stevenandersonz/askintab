@@ -23,7 +23,7 @@
 .companion-action-container {
   width: 100%;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-direction: row;
   gap: 10px;
 }
