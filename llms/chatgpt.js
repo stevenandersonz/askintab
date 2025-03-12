@@ -49,11 +49,14 @@ function handlePrompt(prompt, tabId){
                 if (mutation.type === 'childList') {
                   mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
-                      let watchFor = "ChatGPT" + document.title
+                      console.log("title" + document.title)
+                      let response = node.textContent.trim()
+                      let watchFor = response.startsWith("ChatGPTNew") ? "ChatGPTNew chat" : "ChatGPT" + document.title 
                       // When ChatGPT is done writing a reponse it triggers a mutation with the whole text prependend with "chatGPT"+title
                       if(DEBUG) console.log("MUTATION: " + node.textContent)
-                      if (node.textContent.trim().startsWith(watchFor)) {
-                        chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
+                      if (response.startsWith(watchFor)) {
+                        if(DEBUG) console.log("SENDING TEXT: ")
+                        chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: response.slice(watchFor.length) });
                         observer.disconnect()
                       }
                     }
