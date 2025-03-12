@@ -15,11 +15,15 @@ uiContainer.innerHTML = `
   </button>
   <form id="${EXT_NAME}-prompt">
     <textarea name="prompter" id="${EXT_NAME}-textarea" class="${getClassName('textarea')}" placeholder="What do you want to know?"></textarea>
+    <div class="${getClassName('action-container')}">
+      <select name="${getClassName('dropdown')}" class="${getClassName('dropdown')}">
+      </select>
     <button type="submit" id="${EXT_NAME}-btn" class="${getClassName('upload-button')}">
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>  
     </button>
+    </div>
   </form>
 `;
 
@@ -52,11 +56,13 @@ form.addEventListener('submit', function (evt) {
   evt.preventDefault();
   let formData = new FormData(this); // Collects form data
   let prompt = formData.get("prompter");
+  let llm = formData.get(getClassName("dropdown"));
+  console.log(llm)
   let selection = document.querySelector(`.${getClassName('selection')}`);
   //console.log(selection)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm: "chatgpt"} }, function(annotation){
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm}}, function(annotation){
     console.log("-----")
     console.log(annotation)
     console.log("-----")

@@ -77,15 +77,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.scripting.executeScript({
         target: { tabId: tab.id },
         function: annotateSelection,
-        args: [info.selectionText]
+        args: [Object.keys(LLMS).filter(llm => LLMS[llm].tabId)]
     });
   }
 });
 
-function annotateSelection(selectedText) {
+function annotateSelection(llms) {
   const EXT_NAME = "companion"
   const selection = window.getSelection();
-  
+  console.log(llms) 
   if (selection.rangeCount > 0) {
     let range = selection.getRangeAt(0)
     let span = document.createElement("span");
@@ -100,6 +100,13 @@ function annotateSelection(selectedText) {
     range.insertNode(span);
 
     let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
+    let llmDropdown = document.querySelector(`.${EXT_NAME}-dropdown`)
+    for(let llm of llms){
+      let option = document.createElement("option")
+      option.value=llm
+      option.innerHTML=llm
+      llmDropdown.appendChild(option)
+    }
     let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
     if(prompterContainer){
       prompterContainer.style.display = "block"

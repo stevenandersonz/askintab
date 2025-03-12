@@ -20,13 +20,26 @@
   gap: 10px;
 }
 
+.companion-action-container {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.companion-dropdown {
+  background-color: #4e4d4d;
+  color: #e0e0e0
+}
+
 .companion-textarea {
   flex: 1;
   padding: 8px;
   box-sizing: border-box;
   border: none;
   border-radius: 4px;
-  background-color: #2a2a2a;
+  background-color: #4e4d4d;
   color: #f0f0f0;
   font-family: "Inter", "Roboto", "Helvetica", sans-serif;
   font-size: 14px;
@@ -51,7 +64,7 @@
   height: 30px;
   border-radius: 50%;
   border: none;
-  background-color: #4CAF50;
+  background-color: #4e4d4d;
   cursor: pointer;
   display: flex;
   align-items: center;
