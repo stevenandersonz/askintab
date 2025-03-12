@@ -5,7 +5,7 @@ const annotations = {
   count: 0,
   saved: [],
   lastSaved: null,
-  preprompt: "",
+  preprompt: "for any type of flow charts use mermaid.js format. make sure it can be rendered\n",
   selectedText: "",
   save: function(prompt,llm, cb){
     this.count += 1 

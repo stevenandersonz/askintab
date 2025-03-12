@@ -1,7 +1,6 @@
 const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
-const LLM_PECIFIC_PROMPT = "for any type of flow charts use mermaid.js format. make sure it can be rendered\n" 
 
 if (DEBUG) console.log("IMPORTING CHATGPT")
 export function chatGPT(tabId, senderId, annotation){
@@ -9,7 +8,7 @@ export function chatGPT(tabId, senderId, annotation){
   //todo: chatgpt doesnt require a debugger
   chrome.debugger.attach({ tabId }, "1.3", function() {
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)
-    handlePrompt(LLM_PECIFIC_PROMPT +annotation.fullPrompt, tabId)
+    handlePrompt(annotation.fullPrompt, tabId)
   })
 }
 
