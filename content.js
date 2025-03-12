@@ -1,4 +1,5 @@
 const EXT_NAME = "companion"
+mermaid.initialize({ startOnLoad: true });
 // Create the UI container (keeping the existing textarea and upload button)
 function getClassName(className){
   if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -98,10 +99,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     let annotationBox = document.createElement("div");
     annotationBox.className = getClassName('annotation-box')
-    annotationBox.innerHTML = marked.parse(request.payload.response) 
-    console.log(pendingAnnotation)
+    annotationBox.innerHTML = request.payload.response
+    // console.log(pendingAnnotation)
     pendingAnnotation.parentNode.insertBefore(annotationBox, pendingAnnotation.nextSibling);
     pendingAnnotation.classList.remove(getClassName('loading'));
+    mermaid.run({ querySelector: ".mermaid" });
   }
     
 });

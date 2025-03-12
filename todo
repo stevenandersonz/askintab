@@ -1,1 +1,7 @@
+[] support images
+[x] support diagrams
+[] default last used llm in dropdown 
+[] support references
+[] add alert for prompt too large
+[] what can we do if prompt too large 
 [] save/load annotations after page reload

@@ -1,4 +1,5 @@
 import {grok, chatGPT} from "./llms/index.js"
+import {marked}from "./libs/marked.min.esm.js"
 
 const annotations = {
   count: 0,
@@ -56,7 +57,16 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
   if (type === "LLM_RESPONSE") {
     console.log(`Sending response to tab: ${senderId}}`)
-    annotations.lastSaved.response = payload
+    // SUPPORT MERMAID.js in markdown
+    const renderer = new marked.Renderer();
+    renderer.code = (tokens) => {
+      console.log(tokens)
+      if (tokens.lang === "mermaid") {
+        return `<div class="mermaid">${tokens.text}</div>`;
+      }
+      return `<pre><code class="${tokens.lang}">${tokens.raw}</code></pre>`;
+    };
+    annotations.lastSaved.response = marked.parse(payload, {renderer})
     annotations.lastSaved.waitingResponse = false
     chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: annotations.lastSaved }); 
   }
@@ -115,3 +125,4 @@ function annotateSelection(llms) {
   }
   // Perform the annotation action
 }
+

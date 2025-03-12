@@ -1,13 +1,15 @@
 const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
+const LLM_PECIFIC_PROMPT = "for any type of flow charts use mermaid.js format. make sure it can be rendered\n" 
+
 if (DEBUG) console.log("IMPORTING CHATGPT")
 export function chatGPT(tabId, senderId, annotation){
   if(DEBUG) console.log(`INITIALIZNG CHATGPT: TAB ${tabId} - SENDER ${senderId} - ANNOTATION: ${annotation}`)
   //todo: chatgpt doesnt require a debugger
   chrome.debugger.attach({ tabId }, "1.3", function() {
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)
-    handlePrompt(annotation.fullPrompt, tabId)
+    handlePrompt(LLM_PECIFIC_PROMPT +annotation.fullPrompt, tabId)
   })
 }
 
@@ -15,8 +17,8 @@ function handlePrompt(prompt, tabId){
   if(DEBUG) console.log(`PROMPT: ${prompt} - TAB ${tabId}`)
   chrome.scripting.executeScript({
     target: { tabId },
-    args: [TEXTAREA],
-    func: function (selector) {
+    args: [TEXTAREA, DEBUG],
+    func: function (selector, DEBUG) {
       let textArea = document.querySelector(selector);
       if (textArea){
         if(DEBUG) console.log('FOUND TEXTAREA')
@@ -38,8 +40,8 @@ function handlePrompt(prompt, tabId){
 
       chrome.scripting.executeScript({
         target: { tabId },
-        args: [BTN_SEND],
-        func: function(selector) {
+        args: [BTN_SEND, DEBUG],
+        func: function(selector, DEBUG) {
           let btnSend = document.querySelector(selector);
           if (btnSend){
             const observer = new MutationObserver(function(mutationsList) {
@@ -49,6 +51,7 @@ function handlePrompt(prompt, tabId){
                     if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
                       let watchFor = "ChatGPT" + document.title
                       // When ChatGPT is done writing a reponse it triggers a mutation with the whole text prependend with "chatGPT"+title
+                      if(DEBUG) console.log("MUTATION: " + node.textContent)
                       if (node.textContent.trim().startsWith(watchFor)) {
                         chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: node.textContent.trim().slice(watchFor.length) });
                         observer.disconnect()
