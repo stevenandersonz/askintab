@@ -7,7 +7,7 @@
     "scripting",
     "activeTab",
     "debugger",
-  "contextMenus"
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -16,6 +16,14 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "action": {
+    "default_icon": {
+      "128": "askintab.png"
+    }
+  },
+  "icons": {
+    "16": "askintab.png"
   },
   "content_scripts": [
     {

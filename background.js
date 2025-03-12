@@ -66,8 +66,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
       id: "annotateText",
-      title: "Annotate Selection",
-      contexts: ["selection"] // Ensures it only appears when text is selected
+      title: "Ask in Tab",
+      contexts: ["selection"], // Ensures it only appears when text is selected
   });
 });
 
