@@ -56,7 +56,7 @@ form.addEventListener('submit', function (evt) {
   //console.log(selection)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm: "grok"} }, function(annotation){
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm: "chatgpt"} }, function(annotation){
     console.log("-----")
     console.log(annotation)
     console.log("-----")
@@ -80,8 +80,6 @@ form.addEventListener('submit', function (evt) {
   })
 });
 //todo:
-// - wire response from llm 
-// - test placing <selection> + <annotation> + <response>  what if selection is half <p> || <ul> ?   
 // - save location of annotation for future visits
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
