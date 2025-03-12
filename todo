@@ -1,8 +1,2 @@
-[] add support for grok
-[] add support for claude
-[] research what happend if model is thinking 
-[] make it more user friendly
-[] add command support
-[] how much content can you sent?
-[] disable the message sending it the active tab is not longer active
-[] can we use inputs?
+[] Model Switcher Option
+[] save/load annotations after page reload
