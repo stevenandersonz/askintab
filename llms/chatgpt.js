@@ -3,17 +3,16 @@ const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
 
 if (DEBUG) console.log("IMPORTING CHATGPT")
-export function chatGPT(tabId, senderId, annotation){
-  if(DEBUG) console.log(`INITIALIZNG CHATGPT: TAB ${tabId} - SENDER ${senderId} - ANNOTATION: ${annotation}`)
+export function chatGPT(llm){
+  const {tabId, currentRequest} = llm
   //todo: chatgpt doesnt require a debugger
   chrome.debugger.attach({ tabId }, "1.3", function() {
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)
-    handlePrompt(annotation.fullPrompt, tabId)
+    handlePrompt(currentRequest.annotation.getPrompt(), tabId)
   })
 }
 
 function handlePrompt(prompt, tabId){
-  if(DEBUG) console.log(`PROMPT: ${prompt} - TAB ${tabId}`)
   chrome.scripting.executeScript({
     target: { tabId },
     args: [TEXTAREA, DEBUG],
@@ -55,7 +54,7 @@ function handlePrompt(prompt, tabId){
                       if(DEBUG) console.log("MUTATION: " + node.textContent)
                       if (response.startsWith(watchFor)) {
                         if(DEBUG) console.log("SENDING TEXT: ")
-                        chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload: response.slice(watchFor.length) });
+                        chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response.slice(watchFor.length), llm: "chatgpt"}});
                         observer.disconnect()
                       }
                     }

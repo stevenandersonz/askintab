@@ -1,5 +1,18 @@
 const EXT_NAME = "companion"
 mermaid.initialize({ startOnLoad: true });
+
+function renderMarkdown(payload){
+  const renderer = new marked.Renderer();
+  renderer.code = (tokens) => {
+    console.log(tokens)
+    if (tokens.lang === "mermaid") {
+      return `<div class="mermaid">${tokens.text}</div>`;
+    }
+    return `<pre><code class="${tokens.lang}">${tokens.raw}</code></pre>`;
+  };
+  return marked.parse(payload, {renderer})
+}
+
 // Create the UI container (keeping the existing textarea and upload button)
 function getClassName(className){
   if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -56,20 +69,19 @@ let form = document.querySelector(`#${getClassName('prompt')}`)
 form.addEventListener('submit', function (evt) {
   evt.preventDefault();
   let formData = new FormData(this); // Collects form data
-  let prompt = formData.get("prompter");
+  let question = formData.get("prompter");
   let llm = formData.get(getClassName("dropdown"));
   console.log(llm)
   let selection = document.querySelector(`.${getClassName('selection')}`);
   //console.log(selection)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {prompt, llm}}, function(annotation){
-    console.log("-----")
-    console.log(annotation)
-    console.log("-----")
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, llm}}, function({id, status}){
+    console.log(`id: ${id} - status ${status}`)
+    if(status === 'failure') return
     let annotationLink = document.createElement("a");
     annotationLink.href=`#`
-    annotationLink.className = `${getClassName(["annotation-link", `link-${annotation.submittedAt}`, "loading"])}`;
+    annotationLink.className = `${getClassName(["annotation-link", `link-${id}`, "loading"])}`;
     annotationLink.addEventListener("click", (e) => {
       e.preventDefault(); // Prevent default link behavior
       console.log("here")
@@ -83,27 +95,30 @@ form.addEventListener('submit', function (evt) {
     selection.appendChild(document.createTextNode(" ")); // Space before the spinner
     selection.appendChild(annotationLink);
     selection.classList.remove(getClassName("selection"))
-    selection.classList.add(getClassName(`annotation-${annotation.submittedAt}`))
+    selection.classList.add(getClassName(`annotation-${id}`))
   })
 });
-//todo:
-// - save location of annotation for future visits
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "LLM_RESPONSE") {
-    let llm = "chatGPT"
-    let urlChat = "https://chatgpt.com/c/67ce6143-1008-800d-a4a6-59ae1306142e"
-    let pendingAnnotation = document.querySelector('.'+getClassName("loading"));
+    console.log(request)
+    let pendingAnnotation = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
     pendingAnnotation.innerText = `[${request.payload.count}]`;
     // Append the spinner inside the annotation span
     
     let annotationBox = document.createElement("div");
     annotationBox.className = getClassName('annotation-box')
-    annotationBox.innerHTML = request.payload.response
-    // console.log(pendingAnnotation)
+    annotationBox.innerHTML = renderMarkdown(request.payload.raw)
     pendingAnnotation.parentNode.insertBefore(annotationBox, pendingAnnotation.nextSibling);
     pendingAnnotation.classList.remove(getClassName('loading'));
     mermaid.run({ querySelector: ".mermaid" });
+  }
+  if (request.type === "LLM_TIMEOUT") {
+    console.log(request)
+    let pendingAnnotation = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
+    console.log(pendingAnnotation)
+    pendingAnnotation.innerText = `[retry]`;
+    pendingAnnotation.classList.remove(getClassName("loading"))
   }
     
 });
