@@ -2,14 +2,17 @@
 [x] support diagrams
 [X] problem with new chat in chatgpt 
 [x] default last used llm in dropdown 
+[x] support multiple requests grok
 [] support images
-[] grok stop working 
+[] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] support references
 [] add alert for prompt too large
 [] what can we do if prompt too large 
 [] save/load annotations after page reload
-[] support multiple requests grok
 [] retry link support for when request timeout 
 [] remove annotations name -> requests all the way 
 [] support key bind command for quick queries 
+[] support new chat creation 
 [] support queries without selection
+[] support cancel chat grok 
+[] support cancel chat chatgpt 

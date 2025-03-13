@@ -16,14 +16,14 @@ const parseResponseBody = (b) => {
 
 
 // GROK needs to setup a debuger due to evt.isTrusted check
-export function grok(tabId, senderId, annotation){
-  if(DEBUG) console.log(`INITIALIZNG GROK: TAB ${tabId} - SENDER ${senderId} - ANNOTATION: ${annotation}`)
+export function grok(llm){
+  const {tabId, currentRequest, name} = llm
   chrome.debugger.attach({ tabId }, "1.3", function() {
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)
     // Enable Network Debugger to watch for requests coming out of grok 
     chrome.debugger.sendCommand({ tabId }, "Network.enable", {}, function() {
       if(DEBUG) console.log(`ENABLING NETWORK SNIFFER @ TAB: ${tabId}`)
-      handlePrompt(annotation.fullPrompt, tabId) 
+      handlePrompt(currentRequest.annotation.getPrompt(), tabId) 
     });
 
     let targetRequestId = null;
@@ -46,12 +46,18 @@ export function grok(tabId, senderId, annotation){
             function (response) {
               if (response) {
                 if(typeof response.body !== 'string') return
-                annotation.response = parseResponseBody(response.body) 
-                annotation.waitingResponse = false
-                // Sends response directly to origin tab
-                chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: annotation }); 
+                let {annotation, timeoutId, senderId} = currentRequest
+                clearTimeout(timeoutId)
+                annotation.save(parseResponseBody(response.body)) 
 
-                if(DEBUG) console.log(`DETACHING FROM TAB: ${tabId}`)
+                // free llm to process new item in the queue
+                llm.processing = false
+                llm.currentRequest = null
+                llm.processQueue()
+                // Sends response directly to origin tab
+                chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: {raw: annotation.response, id: annotation.submittedAt, count: annotation.state.data.length} }); 
+
+                if(DEBUG) console.log(`${name.toUpperCase()} - REQUEST COMPLETED \n DETACHING FROM TAB: ${tabId}`)
                 chrome.debugger.detach({ tabId });
               }
             }

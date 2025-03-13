@@ -75,7 +75,7 @@ LLM.prototype.processQueue = function(){
   this.send()
 }
 
-const llms = [new LLM('grok', 'grok.com', (...args) => console.log(args)), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
+const llms = [new LLM('grok', 'grok.com', grok), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
