@@ -7,6 +7,7 @@
 [x] support key bind command for quick queries 
 [x] support setting key bind on popup
 [x] grok is complaining about detaching debugger
+[x] chatgpt doesnt need debugger
 [] improve ux
 [] support base prompt as text file per llm 
 [] save/load annotations after page reload

@@ -1,3 +1,5 @@
+import { submitPrompt, selectTextArea } from "../utils/dom_helpers.js"
+
 const BTN_SEND = 'form button[type="submit"]:not(#companion-btn)'
 const TEXTAREA = 'form textarea:not(#companion-textarea)'
 const REQUESTS_TO = "https://grok.com/rest/app-chat/conversations"
@@ -87,16 +89,3 @@ export async function grok(llm){
   chrome.debugger.onEvent.addListener(handleNetworkEvt);
 }
 
-function selectTextArea(selector){
-  let textArea = document.querySelector(selector);
-  if (textArea){
-    textArea.focus();
-  } 
-}
-
-function submitPrompt(selector) {
-  let btnSend = document.querySelector(selector);
-  if (btnSend){
-    btnSend.click();
-  } 
-}
