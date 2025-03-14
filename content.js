@@ -48,43 +48,77 @@ document.querySelector(`.${getClassName('close-btn')}`).addEventListener("click"
   document.querySelector(`.${getClassName('selection')}`).classList.remove(`${getClassName('selection')}`);
 })
 
+
+let floatingCnt = document.createElement("div");
+let closeBtn = document.createElement("button");
+closeBtn.innerHTML = 'x'
+floatingCnt.classList.add(getClassName("floating-cnt"))
+floatingCnt.classList.add(getClassName("hidden"))
+closeBtn.classList.add(getClassName('floating-btn-close'))
+closeBtn.addEventListener("click", () => {
+  floatingCnt.classList.toggle(getClassName('hidden'));
+});
+floatingCnt.appendChild(closeBtn)
+document.body.appendChild(floatingCnt); 
+
 let selectedText = ""
-document.addEventListener("keydown", function (event) {
-  if (event.ctrlKey && event.key === "k") {
-    console.log("HERE")
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-      chrome.runtime.sendMessage({ type: "LLM_INFO"}, function(llms){
-        let range = selection.getRangeAt(0)
-        let span = document.createElement("span");
-        span.className = getClassName("selection");
-    
-        // // Extract the selected content and append it to the span
-        // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
-        let extractedContents = range.extractContents();
-        span.appendChild(extractedContents);
-    
-        // // Insert the span back into the document
-        range.insertNode(span);
-        
-        let prompterContainer = document.querySelector(`.${getClassName('container')}`)
-        let llmDropdown = document.querySelector(`.${getClassName('dropdown')}`)
-        llmDropdown.innerHTML = ""
-        for(let llm of llms){
-          let option = document.createElement("option")
-          option.value=llm.name
-          option.innerHTML=llm.name
-          llmDropdown.appendChild(option)
+let storedShortcut = "";
+
+// Load the stored shortcut
+chrome.storage.sync.get("shortcut", (data) => {
+    if (data.shortcut) storedShortcut = data.shortcut.toLowerCase();
+});
+
+// Listen for keydown events
+document.addEventListener("keydown", (event) => {
+    chrome.storage.sync.get("shortcut", (data) => {
+        if (data.shortcut) {
+            let shortcut = data.shortcut.toLowerCase();
+            let pressedKeys = [];
+
+            if (event.ctrlKey) pressedKeys.push("control");
+            if (event.shiftKey) pressedKeys.push("shift");
+            if (event.altKey) pressedKeys.push("alt");
+            if (event.metaKey) pressedKeys.push("meta"); // Cmd on Mac
+
+            pressedKeys.push(event.key.toLowerCase());
+
+            if (pressedKeys.join(" + ") === shortcut) {
+              event.preventDefault();
+
+              chrome.runtime.sendMessage({ type: "LLM_INFO"}, function(llms){
+                let prompterContainer = document.querySelector(`.${getClassName('container')}`)
+                let llmDropdown = document.querySelector(`.${getClassName('dropdown')}`)
+                llmDropdown.innerHTML = ""
+                for(let llm of llms){
+                  let option = document.createElement("option")
+                  option.value=llm.name
+                  option.innerHTML=llm.name
+                  llmDropdown.appendChild(option)
+                }
+                let prompterInput = document.querySelector(`.${getClassName('textarea')}`)
+                if(prompterContainer){
+                  prompterContainer.style.display = "block"
+                  prompterInput.focus({ preventScroll: true })
+                }
+              })
+
+              const selection = window.getSelection();
+              if (selection.rangeCount > 0) {
+                console.log(selection)
+                let range = selection.getRangeAt(0)
+                let span = document.createElement("span");
+                span.className = getClassName(["selection"]);
+            
+                // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
+                let extractedContents = range.extractContents();
+                span.appendChild(extractedContents);
+                range.insertNode(span);
+                selectedText = range.toString()
+              } 
+            } 
         }
-        let prompterInput = document.querySelector(`.${getClassName('textarea')}`)
-        if(prompterContainer){
-          selectedText = range.toString()
-          prompterContainer.style.display = "block"
-          prompterInput.focus({ preventScroll: true })
-        }
-      })
-    } 
-  }
+    });
 });
 
 let form = document.querySelector(`#${getClassName('prompt')}`)
@@ -101,46 +135,61 @@ form.addEventListener('submit', function (evt) {
   chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, llm, selectedText}}, function({id, status}){
     console.log(`id: ${id} - status ${status}`)
     if(status === 'failure') return
-    let annotationLink = document.createElement("a");
-    annotationLink.href=`#`
-    annotationLink.className = `${getClassName(["annotation-link", `link-${id}`, "loading"])}`;
-    annotationLink.addEventListener("click", (e) => {
-      e.preventDefault(); // Prevent default link behavior
-      console.log("here")
-      let existingBox = annotationLink.nextElementSibling;
-      if (existingBox && existingBox.classList.contains(getClassName('annotation-box'))) {
-          existingBox.classList.toggle(getClassName('hidden')); // Toggle visibility
-          return;
-      }
-    });
-    // Append the spinner inside the annotation span
-    selection.appendChild(document.createTextNode(" ")); // Space before the spinner
-    selection.appendChild(annotationLink);
-    selection.classList.remove(getClassName("selection"))
-    selection.classList.add(getClassName(`annotation-${id}`))
+    if (selectedText.length > 0){
+      let link = document.createElement("a");
+      link.href=`#`
+      link.className = `${getClassName(['link-'+id, "loading"])}`;
+      link.addEventListener("click", (e) => {
+        e.preventDefault(); // Prevent default link behavior
+        console.log("here")
+        let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
+        if (responseCnt) {
+            responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
+            return;
+        }
+      });
+      // Append the spinner inside the annotation span
+      selection.appendChild(document.createTextNode(" ")); // Space before the spinner
+      selection.appendChild(link);
+      selection.classList.remove(getClassName("selection"))
+      selection.classList.add(getClassName('request-'+id))
+    } 
+    // else {
+    //   let staticResponse = document.querySelector("." + getClassName("static-response"))
+    //   staticResponse.classList.add(getClassName("response-"+id))
+      
+    // }
   })
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "LLM_RESPONSE") {
+    console.log("RESPONSE")
     console.log(request)
-    let pendingAnnotation = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
-    pendingAnnotation.innerText = `[${request.payload.count}]`;
-    // Append the spinner inside the annotation span
+    let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
+    let pendingLink = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
+    let responseCnt = document.createElement("div");
+    responseCnt.className = getClassName(['response-'+request.payload.id])
+    responseCnt.innerHTML = renderMarkdown(request.payload.raw)
+    if(pendingLink){
+      pendingLink.innerText = `[${links.length}]`;
+      pendingLink.parentNode.appendChild(responseCnt);
+      pendingLink.classList.remove(getClassName('loading'));
+    }else{
+      let staticResponse = document.querySelector('.'+getClassName(`floating-cnt`)) 
+      if(staticResponse){
+        staticResponse.innerHTML = ""
+        staticResponse.classList.toggle(getClassName("hidden"))
+        staticResponse.appendChild(responseCnt) 
+      }
+    }
     
-    let annotationBox = document.createElement("div");
-    annotationBox.className = getClassName('annotation-box')
-    annotationBox.innerHTML = renderMarkdown(request.payload.raw)
-    pendingAnnotation.parentNode.insertBefore(annotationBox, pendingAnnotation.nextSibling);
-    pendingAnnotation.classList.remove(getClassName('loading'));
     mermaid.run({ querySelector: ".mermaid" });
   }
   if (request.type === "LLM_TIMEOUT") {
-    console.log(request)
-    let pendingAnnotation = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
-    console.log(pendingAnnotation)
-    pendingAnnotation.innerText = `[retry]`;
-    pendingAnnotation.classList.remove(getClassName("loading"))
+    let pendingLink = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
+    pendingLink.innerText = `[retry]`;
+    pendingLink.classList.remove(getClassName("loading"))
   }
     
 });

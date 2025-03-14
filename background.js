@@ -35,7 +35,7 @@ Annotation.prototype.getPrompt = function(){
   return `${this.state.basePrompt} \n ${this.question} \n ${this.selectedText}` 
 }
 
-function LLM (name, url, send) {
+function LLM (name, url, send, useDebugger=false) {
   this.name = name
   this.url = url
   this.lastUsed = null
@@ -43,6 +43,8 @@ function LLM (name, url, send) {
   this.queue = []
   this.processing = false
   this.currentRequest = null
+  this.useDebugger = useDebugger
+  this.debuggerAttached = false 
   this.send = function() {
     if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n Prompt: ${this.currentRequest.annotation.getPrompt()} \n ITEMS IN QUEUE: ${this.queue.length}`)
     send(this)
@@ -73,7 +75,7 @@ LLM.prototype.processQueue = function(){
   this.send()
 }
 
-const llms = [new LLM('grok', 'grok.com', grok), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
+const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms

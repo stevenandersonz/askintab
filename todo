@@ -3,11 +3,14 @@
 [X] problem with new chat in chatgpt 
 [x] default last used llm in dropdown 
 [x] support multiple requests grok
-[] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
-[] support queries without selection
+[x] support queries without selection
 [x] support key bind command for quick queries 
+[x] support setting key bind on popup
+[x] grok is complaining about detaching debugger
+[] improve ux
 [] support base prompt as text file per llm 
 [] save/load annotations after page reload
+[] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] support references
 
 [] add alert for prompt too large
@@ -17,4 +20,5 @@
 [] support new chat creation 
 [] support cancel chat grok 
 [] support cancel chat chatgpt 
+[] support annotation versioning in pages
 [] support images
