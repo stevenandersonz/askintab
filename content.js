@@ -41,27 +41,49 @@ uiContainer.innerHTML = `
   </form>
 `;
 
-// Append the UI to the body and position it at the bottom
-uiContainer.style.position = 'fixed';
-uiContainer.style.bottom = '20px';
-uiContainer.style.left = '50%';
-uiContainer.style.transform = 'translateX(-50%)';
-uiContainer.style.zIndex = '1000';
 uiContainer.style.display = 'none';
 document.body.appendChild(uiContainer);
 document.querySelector(`.${getClassName('close-btn')}`).addEventListener("click", function(){
   document.querySelector(`.${getClassName('container')}`).style.display = 'none'
   document.querySelector(`.${getClassName('selection')}`).classList.remove(`${getClassName('selection')}`);
 })
-// Variables for selection, position, and annotations
-let selectionPosition = { x: 0, y: 0 };
-let annotationCounter = 0; // Track the number of annotations
-const annotations = new Map(); // Map to store annotations and their linked <p> nodes
 
+let selectedText = ""
 document.addEventListener("keydown", function (event) {
   if (event.ctrlKey && event.key === "k") {
-      event.preventDefault(); // Prevents default browser behavior (like search or hyperlink focus)
-      console.log("Hello");
+    console.log("HERE")
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      chrome.runtime.sendMessage({ type: "LLM_INFO"}, function(llms){
+        let range = selection.getRangeAt(0)
+        let span = document.createElement("span");
+        span.className = getClassName("selection");
+    
+        // // Extract the selected content and append it to the span
+        // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
+        let extractedContents = range.extractContents();
+        span.appendChild(extractedContents);
+    
+        // // Insert the span back into the document
+        range.insertNode(span);
+        
+        let prompterContainer = document.querySelector(`.${getClassName('container')}`)
+        let llmDropdown = document.querySelector(`.${getClassName('dropdown')}`)
+        llmDropdown.innerHTML = ""
+        for(let llm of llms){
+          let option = document.createElement("option")
+          option.value=llm.name
+          option.innerHTML=llm.name
+          llmDropdown.appendChild(option)
+        }
+        let prompterInput = document.querySelector(`.${getClassName('textarea')}`)
+        if(prompterContainer){
+          selectedText = range.toString()
+          prompterContainer.style.display = "block"
+          prompterInput.focus({ preventScroll: true })
+        }
+      })
+    } 
   }
 });
 
@@ -76,7 +98,7 @@ form.addEventListener('submit', function (evt) {
   //console.log(selection)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, llm}}, function({id, status}){
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, llm, selectedText}}, function({id, status}){
     console.log(`id: ${id} - status ${status}`)
     if(status === 'failure') return
     let annotationLink = document.createElement("a");

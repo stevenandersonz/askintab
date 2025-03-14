@@ -35,8 +35,6 @@ Annotation.prototype.getPrompt = function(){
   return `${this.state.basePrompt} \n ${this.question} \n ${this.selectedText}` 
 }
 
-let selectedText = ""
-
 function LLM (name, url, send) {
   this.name = name
   this.url = url
@@ -95,11 +93,10 @@ for(let llm of llms){
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, llm } = payload
+    const { question, llm, selectedText } = payload
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     const request = {question, senderId: sender.tab.id, submittedAt: Date.now(), selectedText} 
     //todo: this should be independent from annotation
-    selectedText = ""
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
     llmsMap[llm].queue.push(request)
     llmsMap[llm].processQueue() 
@@ -121,58 +118,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     llm.processQueue()
   }
 
-});
-
-// --- HANDLE Right click over selection and shows ask ai option
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-      id: "annotateText",
-      title: "Ask in Tab",
-      contexts: ["selection"], // Ensures it only appears when text is selected
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "annotateText" && info.selectionText) {
-    selectedText = info.selectionText
-    chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        function: annotateSelection,
-        args: [llms.filter(llm => llm.tabId).sort((a,b) => b.lastUsed - a.lastUsed)]
-    });
+  if(type === "LLM_INFO") {
+    sendResponse(llms.filter(llm => llm.tabId).sort((a,b) => b.lastUsed - a.lastUsed))
   }
+
 });
-
-function annotateSelection(llms) {
-  const EXT_NAME = "companion"
-  const selection = window.getSelection();
-  console.log(llms) 
-  if (selection.rangeCount > 0) {
-    let range = selection.getRangeAt(0)
-    let span = document.createElement("span");
-    span.className = EXT_NAME + "-selection";
-
-    // // Extract the selected content and append it to the span
-    // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
-    let extractedContents = range.extractContents();
-    span.appendChild(extractedContents);
-
-    // // Insert the span back into the document
-    range.insertNode(span);
-
-    let prompterContainer = document.querySelector(`.${EXT_NAME}-container`)
-    let llmDropdown = document.querySelector(`.${EXT_NAME}-dropdown`)
-    llmDropdown.innerHTML = ""
-    for(let llm of llms){
-      let option = document.createElement("option")
-      option.value=llm.name
-      option.innerHTML=llm.name
-      llmDropdown.appendChild(option)
-    }
-    let prompterInput = document.querySelector(`.${EXT_NAME}-textarea`)
-    if(prompterContainer){
-      prompterContainer.style.display = "block"
-      prompterInput.focus()
-    }
-  }
-}
