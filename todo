@@ -9,7 +9,7 @@
 [x] grok is complaining about detaching debugger
 [x] chatgpt doesnt need debugger
 [] improve ux
-[] support base prompt as text file per llm 
+[x] support base prompt as text file per llm 
 [] save/load annotations after page reload
 [] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] support references

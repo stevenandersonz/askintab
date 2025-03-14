@@ -30,8 +30,8 @@ let debuggerTimeoutId = null
 // GROK needs to setup a debuger due to evt.isTrusted check
 export async function grok(llm){
   const {tabId, currentRequest, name} = llm
-  const prompt = currentRequest.annotation.getPrompt()
-  console.log(llm)
+  const basePrompt = await llm.getPrompt()
+  const prompt = currentRequest.annotation.getPrompt(basePrompt)
   if(!llm.debuggerAttached && llm.useDebugger){
     await chrome.debugger.attach({ tabId }, "1.3")
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)

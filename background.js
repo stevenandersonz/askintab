@@ -6,8 +6,8 @@ const TIMEOUT_AFTER = 1000*60*10
 function annotations(){}
 
 annotations.prototype.state = {
-  basePrompt: "for any type of flow charts use mermaid.js format. make sure it can be rendered\n",
   data:[],
+  //todo: i don't think i need count
   count:0,
 }
 
@@ -31,8 +31,8 @@ function Annotation(llm, question, selectedText, submittedAt) {
 
 Annotation.prototype = Object.create(annotations.prototype)
 Annotation.prototype.constructor = Annotation 
-Annotation.prototype.getPrompt = function(){
-  return `${this.state.basePrompt} \n ${this.question} \n ${this.selectedText}` 
+Annotation.prototype.getPrompt = function(llmPrompt){
+  return `${llmPrompt} \n ${this.question} \n ${this.selectedText}` 
 }
 
 function LLM (name, url, send, useDebugger=false) {
@@ -48,6 +48,19 @@ function LLM (name, url, send, useDebugger=false) {
   this.send = function() {
     if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n Prompt: ${this.currentRequest.annotation.getPrompt()} \n ITEMS IN QUEUE: ${this.queue.length}`)
     send(this)
+  }
+  this.getPrompt = async function(){
+    const url = chrome.runtime.getURL(`data/${this.name}-prompt.txt`);
+    console.log(url)
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to load ${url}`);
+      const text = await response.text();
+      return text;
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
   }
 }
 
@@ -83,6 +96,7 @@ let llmsMap = llms.reduce((llms, llm) => {
 
 // Check availables LLMS
 for(let llm of llms){
+  llm.getPrompt().then(text=> console.log(text))
   const urlPattern = `*://*.${llm.url}/*`;
   chrome.tabs.query({ url: urlPattern }, function(tabs) {
     if(tabs.length <= 0) return
