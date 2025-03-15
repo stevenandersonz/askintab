@@ -75,7 +75,7 @@ export async function grok(llm){
   
           if(DEBUG) console.log(`${name.toUpperCase()} - REQUEST COMPLETED`)
           const {response, submittedAt} = annotation.state.data[annotation.state.data.length-1]
-          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: {raw: response, id: submittedAt} }); 
+          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: response, id: submittedAt }); 
           llm.processing = false
           llm.currentRequest = null
           targetRequestId=null

@@ -23,19 +23,22 @@ const popover = document.createElement('div');
 popover.classList = getClassName('popover')
 popover.innerHTML = `
   <form class="${getClassName('popover-form')}">
-    <textarea name="question" placeholder="ask anything"></textarea>
-    <button type="submit">Ask</button>
+    <textarea name="question" placeholder="ask anything then hit enter"></textarea>
   </form>
 `;
+
+
+
 document.addEventListener('click', (e) => {
   if (!popover.contains(e.target)) {
-      popover.classList.remove('open');
-      document.querySelector("."+getClassName("selection")).classList.remove(getClassName("selection"))
+    popover.classList.remove('open');
+    let sel = document.querySelector("."+getClassName("selection"))
+    if (sel) sel.classList.remove(getClassName("selection"))
   }
 });
+
 document.body.appendChild(popover);
 
-let selectedText = ""
 let storedShortcut = "";
 
 // Load the stored shortcut
@@ -88,73 +91,85 @@ document.addEventListener("keydown", (event) => {
           positionPopover(range);
           let span = document.createElement("span");
           span.className = getClassName(["selection"]);
+          let input = popover.querySelector("textarea")
+          input.focus()
       
-          // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
           let extractedContents = range.extractContents();
           span.appendChild(extractedContents);
           range.insertNode(span);
-          selectedText = range.toString()
         } 
       } 
     }
   });
 });
-
 let form = popover.querySelector("form")
+let textarea = popover.querySelector("textarea")
+
+textarea.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { 
+      e.preventDefault(); 
+      form.dispatchEvent(new Event('submit'));
+  }
+});
+
 form.addEventListener('submit', function (evt) {
   evt.preventDefault();
   let formData = new FormData(this); // Collects form data
-  let question = formData.get("prompter");
-  let llm = formData.get(getClassName("dropdown"));
-  console.log(llm)
+  let question = formData.get("question");
   let selection = document.querySelector(`.${getClassName('selection')}`);
-  //console.log(selection)
+  console.log(selection.textContent)
   this.parentNode.style.display = "none";
   this.reset()
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, llm, selectedText}}, function({id, status}){
-    console.log(`id: ${id} - status ${status}`)
-    if(status === 'failure') return
-    if (selectedText.length > 0){
-      let link = document.createElement("a");
-      link.href=`#`
-      link.className = `${getClassName(['link-'+id, "loading"])}`;
-      link.addEventListener("click", (e) => {
-        e.preventDefault(); // Prevent default link behavior
-        console.log("here")
-        let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
-        if (responseCnt) {
-            responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
-            return;
-        }
-      });
-      // Append the spinner inside the annotation span
-      selection.appendChild(document.createTextNode(" ")); // Space before the spinner
-      selection.appendChild(link);
-      selection.classList.remove(getClassName("selection"))
-      selection.classList.add(getClassName('request-'+id))
-    } 
+  chrome.storage.sync.get("selectedLLM").then((llm)=>{
+    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm: llm.selectedLLM}}, function(res){
+      console.log(res)
+      const {id, status} = res
+      console.log(`id: ${id} - status ${status}`)
+      if(status === 'failure') return
+      if (selection.textContent.length > 0){
+        let link = document.createElement("a");
+        link.href=`#`
+        link.className = `${getClassName(['link-'+id, "loading"])}`;
+        link.addEventListener("click", (e) => {
+          e.preventDefault(); // Prevent default link behavior
+          console.log("here")
+          let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
+          if (responseCnt) {
+              responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
+              return;
+          }
+        });
+        // Append the spinner inside the annotation span
+        selection.appendChild(document.createTextNode(" ")); // Space before the spinner
+        selection.appendChild(link);
+        selection.classList.remove(getClassName("selection"))
+        selection.classList.add(getClassName('request-'+id))
+      } 
+    })
   })
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "LLM_RESPONSE") {
-    console.log("RESPONSE")
     console.log(request)
     let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-    let pendingLink = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
+    let pendingLink = document.querySelector('.'+getClassName(`link-${request.id}`));
     let responseCnt = document.createElement("div");
-    responseCnt.className = getClassName(['response-'+request.payload.id])
-    responseCnt.innerHTML = renderMarkdown(request.payload.raw)
+    responseCnt.className = getClassName(['response-'+request.id, "hidden"])
+    responseCnt.innerHTML = `
+      <a href="#" class="${getClassName("llm-link")}">See in LLM</a>
+    `
+    responseCnt.innerHTML += renderMarkdown(request.raw)
     if(pendingLink){
       pendingLink.innerText = `[${links.length}]`;
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
     }
     
-    mermaid.run({ querySelector: ".mermaid" });
+    mermaid.run({ querySelector: ".mermaid" }); 
   }
   if (request.type === "LLM_TIMEOUT") {
-    let pendingLink = document.querySelector('.'+getClassName(`link-${request.payload.id}`));
+    let pendingLink = document.querySelector('.'+getClassName(`link-${request.id}`));
     pendingLink.innerText = `[retry]`;
     pendingLink.classList.remove(getClassName("loading"))
   }

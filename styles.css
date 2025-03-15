@@ -5,19 +5,46 @@
   color: blue
 }
 
+.companion-loading::after {
+  content: "[⏳]";
+  animation: spin 1s linear infinite;
+}
+
 [class^="companion-response"] {
-  /* dark background */
-  border: solid #2a2a2a 1px;
-  padding: 12px 16px;
-  margin-top: 10px;
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 1.4;
-  /* light gray text for readability */
-  line-height: 1.6;
+  max-width: 450px;
   width: 100%;
-  box-shadow: 2px 2px 8px rgba(255, 255, 255, 0.1);
-  /* soft shadow for depth */
+  background-color: #222227;
+  border-radius: 10px;
+  padding: 20px;
+  position: relative;
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d0d0d5;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: linear-gradient(145deg, #222227, #222227) padding-box,
+    linear-gradient(145deg, rgba(100, 100, 255, 0.2), rgba(0, 122, 255, 0.1)) border-box;
+  border: 2px solid transparent;
+}
+
+.companion-llm-link {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 12px;
+  color: #007aff;
+  /* Blue to match the gradient */
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.companion-llm-link:hover {
+  text-decoration: underline;
+}
+
+.companion-selection {
+  background-color: rgba(215, 100, 0, 0.3);
 }
 
 .companion-popover {

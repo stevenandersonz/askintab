@@ -77,7 +77,7 @@ LLM.prototype.processQueue = function(){
     if(this.processing && this.currentRequest === req) {
       //todo we might want to sent more information
       console.log(`REQUEST TIMEOUT ${this.name}`)
-      chrome.tabs.sendMessage(req.senderId, { type: "LLM_TIMEOUT", payload: {id: req.submittedAt}}); 
+      chrome.tabs.sendMessage(req.senderId, { type: "LLM_TIMEOUT", id: req.submittedAt}); 
       this.processing = false;
       this.currentRequest = null;
       this.processQueue();
@@ -106,10 +106,11 @@ for(let llm of llms){
   });
 }
 
-chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, llm, selectedText } = payload
+    const { question, selectedText, llm} = payload
+    console.log(llm)
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     const request = {question, senderId: sender.tab.id, submittedAt: Date.now(), selectedText} 
     //todo: this should be independent from annotation
@@ -117,6 +118,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     llmsMap[llm].queue.push(request)
     llmsMap[llm].processQueue() 
     sendResponse({ id: request.submittedAt, status: "processing"})
+    return true
   }
 
   if (type === "LLM_RESPONSE") {
@@ -126,7 +128,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     clearTimeout(timeoutId)
     annotation.save(payload.raw) 
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: {raw: payload.raw, id: annotation.submittedAt, count: annotation.state.data.length} }); 
+    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: payload.raw, id: annotation.submittedAt }); 
 
     // free llm to process new item in the queue
     llm.processing = false
