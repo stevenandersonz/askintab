@@ -19,47 +19,21 @@ function getClassName(className){
   if(typeof className === 'string') return EXT_NAME + '-' + className
 }
 
-const uiContainer = document.createElement('div');
-uiContainer.className = getClassName('container');
-uiContainer.innerHTML = `
-  <button id="${EXT_NAME}-close-btn" class="${getClassName('close-btn')}">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 9L12 15L18 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-  </button>
-  <form id="${EXT_NAME}-prompt">
-    <textarea name="prompter" id="${EXT_NAME}-textarea" class="${getClassName('textarea')}" placeholder="What do you want to know?"></textarea>
-    <div class="${getClassName('action-container')}">
-      <select name="${getClassName('dropdown')}" class="${getClassName('dropdown')}">
-      </select>
-    <button type="submit" id="${EXT_NAME}-btn" class="${getClassName('upload-button')}">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>  
-    </button>
-    </div>
+const popover = document.createElement('div');
+popover.classList = getClassName('popover')
+popover.innerHTML = `
+  <form class="${getClassName('popover-form')}">
+    <textarea name="question" placeholder="ask anything"></textarea>
+    <button type="submit">Ask</button>
   </form>
 `;
-
-uiContainer.style.display = 'none';
-document.body.appendChild(uiContainer);
-document.querySelector(`.${getClassName('close-btn')}`).addEventListener("click", function(){
-  document.querySelector(`.${getClassName('container')}`).style.display = 'none'
-  document.querySelector(`.${getClassName('selection')}`).classList.remove(`${getClassName('selection')}`);
-})
-
-
-let floatingCnt = document.createElement("div");
-let closeBtn = document.createElement("button");
-closeBtn.innerHTML = 'x'
-floatingCnt.classList.add(getClassName("floating-cnt"))
-floatingCnt.classList.add(getClassName("hidden"))
-closeBtn.classList.add(getClassName('floating-btn-close'))
-closeBtn.addEventListener("click", () => {
-  floatingCnt.classList.toggle(getClassName('hidden'));
+document.addEventListener('click', (e) => {
+  if (!popover.contains(e.target)) {
+      popover.classList.remove('open');
+      document.querySelector("."+getClassName("selection")).classList.remove(getClassName("selection"))
+  }
 });
-floatingCnt.appendChild(closeBtn)
-document.body.appendChild(floatingCnt); 
+document.body.appendChild(popover);
 
 let selectedText = ""
 let storedShortcut = "";
@@ -69,59 +43,64 @@ chrome.storage.sync.get("shortcut", (data) => {
     if (data.shortcut) storedShortcut = data.shortcut.toLowerCase();
 });
 
+function positionPopover(range) {
+  const rect = range.getBoundingClientRect();
+  const popoverWidth = popover.offsetWidth;
+
+  // Position below selection, centered with selection midpoint
+  let top = rect.bottom + window.scrollY + 10;
+  let selectionMidpoint = rect.left + (rect.width / 2);
+  let left = selectionMidpoint - (popoverWidth / 2) + window.scrollX;
+
+  // Boundary checks
+  if (left < 10) {
+      left = 10;
+  }
+  if (left + popoverWidth > window.innerWidth - 10) {
+      left = window.innerWidth - popoverWidth - 10;
+  }
+
+  popover.style.top = `${top}px`;
+  popover.style.left = `${left}px`;
+}
+
 // Listen for keydown events
 document.addEventListener("keydown", (event) => {
-    chrome.storage.sync.get("shortcut", (data) => {
-        if (data.shortcut) {
-            let shortcut = data.shortcut.toLowerCase();
-            let pressedKeys = [];
+  chrome.storage.sync.get("shortcut", (data) => {
+    if (data.shortcut) {
+      let shortcut = data.shortcut.toLowerCase();
+      let pressedKeys = [];
 
-            if (event.ctrlKey) pressedKeys.push("control");
-            if (event.shiftKey) pressedKeys.push("shift");
-            if (event.altKey) pressedKeys.push("alt");
-            if (event.metaKey) pressedKeys.push("meta"); // Cmd on Mac
+      if (event.ctrlKey) pressedKeys.push("control");
+      if (event.shiftKey) pressedKeys.push("shift");
+      if (event.altKey) pressedKeys.push("alt");
+      if (event.metaKey) pressedKeys.push("meta"); // Cmd on Mac
 
-            pressedKeys.push(event.key.toLowerCase());
+      pressedKeys.push(event.key.toLowerCase());
 
-            if (pressedKeys.join(" + ") === shortcut) {
-              event.preventDefault();
-
-              chrome.runtime.sendMessage({ type: "LLM_INFO"}, function(llms){
-                let prompterContainer = document.querySelector(`.${getClassName('container')}`)
-                let llmDropdown = document.querySelector(`.${getClassName('dropdown')}`)
-                llmDropdown.innerHTML = ""
-                for(let llm of llms){
-                  let option = document.createElement("option")
-                  option.value=llm.name
-                  option.innerHTML=llm.name
-                  llmDropdown.appendChild(option)
-                }
-                let prompterInput = document.querySelector(`.${getClassName('textarea')}`)
-                if(prompterContainer){
-                  prompterContainer.style.display = "block"
-                  prompterInput.focus({ preventScroll: true })
-                }
-              })
-
-              const selection = window.getSelection();
-              if (selection.rangeCount > 0) {
-                console.log(selection)
-                let range = selection.getRangeAt(0)
-                let span = document.createElement("span");
-                span.className = getClassName(["selection"]);
-            
-                // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
-                let extractedContents = range.extractContents();
-                span.appendChild(extractedContents);
-                range.insertNode(span);
-                selectedText = range.toString()
-              } 
-            } 
-        }
-    });
+      if (pressedKeys.join(" + ") === shortcut) {
+        event.preventDefault();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          console.log(selection)
+          let range = selection.getRangeAt(0)
+          popover.classList.toggle("open")
+          positionPopover(range);
+          let span = document.createElement("span");
+          span.className = getClassName(["selection"]);
+      
+          // TODO: this method will clone part of a selected object and insert it back into the parent. maybe selection should find the closest block?
+          let extractedContents = range.extractContents();
+          span.appendChild(extractedContents);
+          range.insertNode(span);
+          selectedText = range.toString()
+        } 
+      } 
+    }
+  });
 });
 
-let form = document.querySelector(`#${getClassName('prompt')}`)
+let form = popover.querySelector("form")
 form.addEventListener('submit', function (evt) {
   evt.preventDefault();
   let formData = new FormData(this); // Collects form data
@@ -154,11 +133,6 @@ form.addEventListener('submit', function (evt) {
       selection.classList.remove(getClassName("selection"))
       selection.classList.add(getClassName('request-'+id))
     } 
-    // else {
-    //   let staticResponse = document.querySelector("." + getClassName("static-response"))
-    //   staticResponse.classList.add(getClassName("response-"+id))
-      
-    // }
   })
 });
 
@@ -175,13 +149,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       pendingLink.innerText = `[${links.length}]`;
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
-    }else{
-      let staticResponse = document.querySelector('.'+getClassName(`floating-cnt`)) 
-      if(staticResponse){
-        staticResponse.innerHTML = ""
-        staticResponse.classList.toggle(getClassName("hidden"))
-        staticResponse.appendChild(responseCnt) 
-      }
     }
     
     mermaid.run({ querySelector: ".mermaid" });
