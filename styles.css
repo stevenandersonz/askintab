@@ -5,11 +5,6 @@
   color: blue
 }
 
-.companion-loading::after {
-  content: "[⏳]";
-  animation: spin 1s linear infinite;
-}
-
 [class^="companion-response"] {
   max-width: 500px;
   width: 100%;
@@ -155,25 +150,4 @@ h3 {
   font-weight: 600;
   margin-bottom: 0.5rem;
   margin-top: 1rem;
-}
-
-.companion-loading::after {
-  content: "[⏳]";
-  animation: spin 1s linear infinite;
-}
-
-@keyframes companion-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  50% {
-    transform: rotate(180deg);
-    /* halfway through a full rotation */
-  }
-
-  100% {
-    transform: rotate(360deg);
-    /* full rotation */
-  }
 }

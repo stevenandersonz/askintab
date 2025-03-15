@@ -113,10 +113,12 @@ for(let llm of llms){
     console.log(tabs)
     console.log(`${llm.domain} is avaible at tab id: ${tabs[0].id}`)
     llm.tabId = tabs[0].id 
+    llm.favicon = tabs[0].favIconUrl
   });
 }
 
 
+console.log(llmsMap)
 
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message

@@ -46,13 +46,6 @@ document.addEventListener('click', (e) => {
 
 document.body.appendChild(popover);
 
-let storedShortcut = "";
-
-// Load the stored shortcut
-chrome.storage.sync.get("shortcut", (data) => {
-    if (data.shortcut) storedShortcut = data.shortcut.toLowerCase();
-});
-
 function positionPopover(range) {
   const rect = range.getBoundingClientRect();
   const popoverWidth = popover.offsetWidth;
@@ -124,19 +117,24 @@ form.addEventListener('submit', function (evt) {
   let formData = new FormData(this); // Collects form data
   let question = formData.get("question");
   let selection = document.querySelector(`.${getClassName('selection')}`);
-  console.log(selection.textContent)
-  this.parentNode.style.display = "none";
+  popover.classList.remove('open') 
   this.reset()
   chrome.storage.sync.get("selectedLLM").then((llm)=>{
     chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm: llm.selectedLLM}}, function(res){
       console.log(res)
-      const {id, status} = res
+      let {id, status} = res
       console.log(`id: ${id} - status ${status}`)
       if(status === 'failure') return
       if (selection.textContent.length > 0){
         let link = document.createElement("a");
         link.href=`#`
         link.className = `${getClassName(['link-'+id, "loading"])}`;
+        link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
+            <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
+              <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+              <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
+            </circle>
+          </svg>]`;
         link.addEventListener("click", (e) => {
           e.preventDefault(); // Prevent default link behavior
           console.log("here")
@@ -147,7 +145,6 @@ form.addEventListener('submit', function (evt) {
           }
         });
         // Append the spinner inside the annotation span
-        selection.appendChild(document.createTextNode(" ")); // Space before the spinner
         selection.appendChild(link);
         selection.classList.remove(getClassName("selection"))
         selection.classList.add(getClassName('request-'+id))
@@ -161,6 +158,7 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     console.log(response)
     let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
     let pendingLink = document.querySelector('.'+getClassName(`link-${response.id}`));
+    pendingLink.innerHTML=`[${links.length}]`
     let responseCnt = document.createElement("div");
     responseCnt.className = getClassName(['response-'+response.id, "hidden", getColorMode()])
     responseCnt.innerHTML = `
@@ -168,7 +166,6 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     `
     responseCnt.innerHTML += renderMarkdown(response.raw)
     if(pendingLink){
-      pendingLink.innerText = `[${links.length}]`;
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
     }
