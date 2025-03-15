@@ -8,15 +8,16 @@
 [x] support setting key bind on popup
 [x] grok is complaining about detaching debugger
 [x] chatgpt doesnt need debugger
-[] improve ux
+[x] improve ux
 [x] support base prompt as text file per llm 
 [] save/load annotations after page reload
 [] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] support references
+[] add error handling 
+[] retry link support for when request timeout 
 
 [] add alert for prompt too large
 [] what can we do if prompt too large 
-[] retry link support for when request timeout 
 [] remove annotations name -> requests all the way 
 [] support new chat creation 
 [] support cancel chat grok 
