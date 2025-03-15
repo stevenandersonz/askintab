@@ -30,7 +30,13 @@ const popover = document.createElement('div');
 popover.classList = getClassName('popover')
 popover.innerHTML = `
   <form class="${getClassName('popover-form')}">
-    <textarea name="question" placeholder="ask anything then hit enter"></textarea>
+    <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything then hit enter"></textarea>
+    <div>
+      <select id="${getClassName('select-ask')}" name="llm"></select>
+      <button id="${getClassName('btn-ask')}" type="submit">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
+      </button>
+    </div>
   </form>
 `;
 
@@ -97,12 +103,24 @@ document.addEventListener("keydown", (event) => {
           let extractedContents = range.extractContents();
           span.appendChild(extractedContents);
           range.insertNode(span);
+
+          chrome.runtime.sendMessage({ type: "LLM_INFO" }, function(llms){
+            let llmDropdown = popover.querySelector("select")
+            llmDropdown.innerHTML = ""
+            for(let llm of llms){
+              let option = document.createElement("option")
+              option.value = llm.name
+              option.innerHTML = llm.name
+              llmDropdown.appendChild(option)
+            }
+          })
         } 
       } 
+      
     }
   });
 });
-let form = popover.querySelector("form")
+let form = document.querySelector("."+getClassName("popover-form"))
 let textarea = popover.querySelector("textarea")
 
 textarea.addEventListener('keydown', (e) => {
@@ -116,40 +134,40 @@ form.addEventListener('submit', function (evt) {
   evt.preventDefault();
   let formData = new FormData(this); // Collects form data
   let question = formData.get("question");
+  let llm = formData.get("llm");
   let selection = document.querySelector(`.${getClassName('selection')}`);
   popover.classList.remove('open') 
   this.reset()
-  chrome.storage.sync.get("selectedLLM").then((llm)=>{
-    chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm: llm.selectedLLM}}, function(res){
-      console.log(res)
-      let {id, status} = res
-      console.log(`id: ${id} - status ${status}`)
-      if(status === 'failure') return
-      if (selection.textContent.length > 0){
-        let link = document.createElement("a");
-        link.href=`#`
-        link.className = `${getClassName(['link-'+id, "loading"])}`;
-        link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
-            <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
-              <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
-              <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
-            </circle>
-          </svg>]`;
-        link.addEventListener("click", (e) => {
-          e.preventDefault(); // Prevent default link behavior
-          console.log("here")
-          let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
-          if (responseCnt) {
-              responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
-              return;
-          }
-        });
-        // Append the spinner inside the annotation span
-        selection.appendChild(link);
-        selection.classList.remove(getClassName("selection"))
-        selection.classList.add(getClassName('request-'+id))
-      } 
-    })
+  console.log(llm)
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm}}, function(res){
+    console.log(res)
+    let {id, status} = res
+    console.log(`id: ${id} - status ${status}`)
+    if(status === 'failure') return
+    if (selection.textContent.length > 0){
+      let link = document.createElement("a");
+      link.href=`#`
+      link.className = `${getClassName(['link-'+id, "loading"])}`;
+      link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
+          <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
+            <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+            <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
+          </circle>
+        </svg>]`;
+      link.addEventListener("click", (e) => {
+        e.preventDefault(); // Prevent default link behavior
+        console.log("here")
+        let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
+        if (responseCnt) {
+            responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
+            return;
+        }
+      });
+      // Append the spinner inside the annotation span
+      selection.appendChild(link);
+      selection.classList.remove(getClassName("selection"))
+      selection.classList.add(getClassName('request-'+id))
+    } 
   })
 });
 

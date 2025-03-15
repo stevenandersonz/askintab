@@ -1,7 +1,7 @@
 import { submitPrompt, selectTextArea } from "../utils/dom_helpers.js"
 
-const BTN_SEND = 'form button[type="submit"]:not(#companion-btn)'
-const TEXTAREA = 'form textarea:not(#companion-textarea)'
+const BTN_SEND = 'form button[type="submit"]:not(#companion-btn-ask)'
+const TEXTAREA = 'form textarea:not(#companion-textarea-ask)'
 const REQUESTS_TO = "https://grok.com/rest/app-chat/conversations"
 const DEBUGGER_TIMEOUT = 1000*60*4
 const DEBUG = true
