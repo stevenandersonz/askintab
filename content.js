@@ -13,6 +13,13 @@ function renderMarkdown(payload){
   return marked.parse(payload, {renderer})
 }
 
+function getColorMode (){
+  const bgColor = getComputedStyle(document.body).backgroundColor; 
+  const rgb = bgColor.match(/\d+/g).map(Number); 
+  const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  return luminance > 0.5 ?'light':'dark'
+}
+
 // Create the UI container (keeping the existing textarea and upload button)
 function getClassName(className){
   if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -149,17 +156,17 @@ form.addEventListener('submit', function (evt) {
   })
 });
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "LLM_RESPONSE") {
-    console.log(request)
+chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
+  if (response.type === "LLM_RESPONSE") {
+    console.log(response)
     let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-    let pendingLink = document.querySelector('.'+getClassName(`link-${request.id}`));
+    let pendingLink = document.querySelector('.'+getClassName(`link-${response.id}`));
     let responseCnt = document.createElement("div");
-    responseCnt.className = getClassName(['response-'+request.id, "hidden"])
+    responseCnt.className = getClassName(['response-'+response.id, "hidden", getColorMode()])
     responseCnt.innerHTML = `
-      <a href="#" class="${getClassName("llm-link")}">See in LLM</a>
+      <a href="${response.conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
     `
-    responseCnt.innerHTML += renderMarkdown(request.raw)
+    responseCnt.innerHTML += renderMarkdown(response.raw)
     if(pendingLink){
       pendingLink.innerText = `[${links.length}]`;
       pendingLink.parentNode.appendChild(responseCnt);
@@ -168,8 +175,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     mermaid.run({ querySelector: ".mermaid" }); 
   }
-  if (request.type === "LLM_TIMEOUT") {
-    let pendingLink = document.querySelector('.'+getClassName(`link-${request.id}`));
+  if (response.type === "LLM_TIMEOUT") {
+    let pendingLink = document.querySelector('.'+getClassName(`link-${response.id}`));
     pendingLink.innerText = `[retry]`;
     pendingLink.classList.remove(getClassName("loading"))
   }

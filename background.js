@@ -11,12 +11,13 @@ annotations.prototype.state = {
   count:0,
 }
 
-annotations.prototype.save = function saveAnnotation (response){
+annotations.prototype.save = function saveAnnotation (response, conversationURL){
   this.state.data.push(this)
   this.state.count++
   this.state.selectedText = ""
   this.response = response
   this.responseAt = Date.now()
+  this.conversationURL = conversationURL
 }
 
 function Annotation(llm, question, selectedText, submittedAt) {
@@ -26,6 +27,7 @@ function Annotation(llm, question, selectedText, submittedAt) {
   this.createdAt = Date.now(),
   this.responseAt = null,
   this.question = question,
+  this.conversationURL = null
   this.llm = llm
 }
 
@@ -35,9 +37,10 @@ Annotation.prototype.getPrompt = function(llmPrompt){
   return `${llmPrompt} \n ${this.question} \n ${this.selectedText}` 
 }
 
-function LLM (name, url, send, useDebugger=false) {
+function LLM (name, domain, send, useDebugger=false) {
   this.name = name
-  this.url = url
+  this.domain = domain
+  this.favicon = null
   this.lastUsed = null
   this.tabId = null
   this.queue = []
@@ -48,6 +51,11 @@ function LLM (name, url, send, useDebugger=false) {
   this.send = function() {
     if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n Prompt: ${this.currentRequest.annotation.getPrompt()} \n ITEMS IN QUEUE: ${this.queue.length}`)
     send(this)
+  }
+  this.getURL = async function() {
+    let tab = await chrome.tabs.get(this.tabId)
+    if (DEBUG) console.log(`${this.name.toUpperCase()} URL: ${tab.url}`)
+    return tab.url
   }
   this.getPrompt = async function(){
     const url = chrome.runtime.getURL(`data/${this.name}-prompt.txt`);
@@ -88,6 +96,7 @@ LLM.prototype.processQueue = function(){
   this.send()
 }
 
+
 const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
@@ -97,14 +106,17 @@ let llmsMap = llms.reduce((llms, llm) => {
 // Check availables LLMS
 for(let llm of llms){
   llm.getPrompt().then(text=> console.log(text))
-  const urlPattern = `*://*.${llm.url}/*`;
+  const urlPattern = `*://*.${llm.domain}/*`;
   chrome.tabs.query({ url: urlPattern }, function(tabs) {
     if(tabs.length <= 0) return
-    if(tabs.length > 1) console.log(`more than one tab for ${llm.url} is present`) 
-    console.log(`${llm.url} is avaible at tab id: ${tabs[0].id}`)
+    if(tabs.length > 1) console.log(`more than one tab for ${llm.domain} is present`) 
+    console.log(tabs)
+    console.log(`${llm.domain} is avaible at tab id: ${tabs[0].id}`)
     llm.tabId = tabs[0].id 
   });
 }
+
+
 
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
@@ -128,7 +140,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     clearTimeout(timeoutId)
     annotation.save(payload.raw) 
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: payload.raw, id: annotation.submittedAt }); 
+    chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: payload.raw, id: annotation.submittedAt, conversationURL: annotation.conversationURL }); 
 
     // free llm to process new item in the queue
     llm.processing = false

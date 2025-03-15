@@ -3,7 +3,7 @@ const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
 
-function watchForResponse (DEBUG){
+function watchForResponse (conversationURL, DEBUG){
   const observer = new MutationObserver(function(mutationsList) {
     for (const mutation of mutationsList) {
       if (mutation.type === 'childList') {
@@ -16,7 +16,7 @@ function watchForResponse (DEBUG){
             if(DEBUG) console.log("MUTATION: " + node.textContent)
             if (response.startsWith(watchFor)) {
               if(DEBUG) console.log("SENDING TEXT: ")
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response.slice(watchFor.length), llm: "chatgpt"}});
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response.slice(watchFor.length), llm: "chatgpt", conversationURL}});
               observer.disconnect()
             }
           }
@@ -30,9 +30,10 @@ if (DEBUG) console.log("IMPORTING CHATGPT")
 export async function chatGPT(llm){
   const {tabId, currentRequest} = llm
   const basePrompt = await llm.getPrompt()
+  const conversationURL = await llm.getURL()
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, currentRequest.annotation.getPrompt(basePrompt)], func: selectAndWriteTextArea})
   if(DEBUG) console.log('PROMPT SET INTO TEXTAREA')
-  await chrome.scripting.executeScript({target: {tabId}, args: [DEBUG], func: watchForResponse})
+  await chrome.scripting.executeScript({target: {tabId}, args: [conversationURL, DEBUG], func: watchForResponse})
   if(DEBUG) console.log('SETTING OBSERVER')
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})
   if(DEBUG) console.log('PROMPT SUBMITTED')

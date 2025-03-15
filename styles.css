@@ -11,21 +11,28 @@
 }
 
 [class^="companion-response"] {
-  max-width: 450px;
+  max-width: 500px;
   width: 100%;
-  background-color: #222227;
   border-radius: 10px;
   padding: 20px;
   position: relative;
   margin-top: 20px;
   font-size: 14px;
   line-height: 1.5;
-  color: #d0d0d5;
   box-sizing: border-box;
   overflow: hidden;
-  background: linear-gradient(145deg, #222227, #222227) padding-box,
-    linear-gradient(145deg, rgba(100, 100, 255, 0.2), rgba(0, 122, 255, 0.1)) border-box;
-  border: 2px solid transparent;
+}
+
+.companion-dark {
+  background: transparent;
+  color: #ffffff;
+  border: #3a3a3a solid 2px;
+}
+
+.companion-light {
+  background: #e7e7e7b8;
+  color: #010101;
+  border: #c4c3c3 solid 2px;
 }
 
 .companion-llm-link {

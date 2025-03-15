@@ -71,11 +71,12 @@ export async function grok(llm){
           if(typeof ret.body !== 'string') return
           let {annotation, timeoutId, senderId} = currentRequest
           clearTimeout(timeoutId)
-          annotation.save(parseResponseBody(ret.body)) 
+          const conversationURL = await llm.getURL()
+          annotation.save(parseResponseBody(ret.body), conversationURL) 
   
           if(DEBUG) console.log(`${name.toUpperCase()} - REQUEST COMPLETED`)
           const {response, submittedAt} = annotation.state.data[annotation.state.data.length-1]
-          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: response, id: submittedAt }); 
+          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: response, id: submittedAt, conversationURL  }); 
           llm.processing = false
           llm.currentRequest = null
           targetRequestId=null
