@@ -9,12 +9,12 @@ const DEBUG = true
 
 if (DEBUG) console.log("IMPORTING GROK")
 
-const parseResponseBody = (b) => {
+const parseResponseBody = (b, newChat=false) => {
   b = b.split('\n')
-  b = JSON.parse(b[b.length-2])  
+  b = JSON.parse(b[b.length-(newChat?3:2)])  
   //TODO: validate response
   if(DEBUG) console.log(`Response Body: ${JSON.stringify(b)}`)
-  return b.result.modelResponse.message
+  return newChat ? b.result.response.modelResponse.message : b.result.modelResponse.message
 }
 
 function setDebuggerTimeout(llm){
@@ -52,12 +52,14 @@ export async function grok(llm){
   if(DEBUG) console.log('BTN_SENT CLICKED')
 
   let targetRequestId = null;
+  let newChat = false;
   async function handleNetworkEvt (source, method, params) {
     // Step 1: Catch the response and store the requestId
     if (method === "Network.responseReceived") {
       if (params.response.url.startsWith(REQUESTS_TO)){
-        if(DEBUG) console.log(`DETECTED REQUEST TO: ${REQUESTS_TO}`)
+        if(DEBUG) console.log(`DETECTED REQUEST TO: ${params.response.url}`)
         targetRequestId = params.requestId; // Save the requestId
+        newChat = params.response.url.includes("new")
       }
     }
     // Step 2: Get the body when the response is "finished"
@@ -68,10 +70,14 @@ export async function grok(llm){
         //let ret = await sendDebuggerCommand(tabId,"Network.getResponseBody",{ requestId: targetRequestId })
         if (ret) {
           if(typeof ret.body !== 'string') return
+          console.log("------") 
+          console.log(JSON.stringify(ret.body))
+          console.log("------") 
           let {timeoutId, senderId} = currentRequest
           clearTimeout(timeoutId)
           const conversationURL = await llm.getURL()
-          currentRequest.saveResponse(parseResponseBody(ret.body), conversationURL) 
+          console.log(params)
+          currentRequest.saveResponse(parseResponseBody(ret.body, true), conversationURL) 
           if(DEBUG) console.log(`${name.toUpperCase()} - REQUEST COMPLETED`)
           chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: currentRequest}); 
           llm.processing = false

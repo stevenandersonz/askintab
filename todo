@@ -10,8 +10,8 @@
 [x] chatgpt doesnt need debugger
 [x] improve ux
 [x] support base prompt as text file per llm 
+[x] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] save/load annotations after page reload
-[] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
 [] support references
 [] add error handling 
 [] retry link support for when request timeout 
