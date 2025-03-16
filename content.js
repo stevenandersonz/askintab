@@ -20,6 +20,7 @@ function getColorMode (){
   return luminance > 0.5 ?'light':'dark'
 }
 
+
 // Create the UI container (keeping the existing textarea and upload button)
 function getClassName(className){
   if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -30,7 +31,7 @@ const popover = document.createElement('div');
 popover.classList = getClassName('popover')
 popover.innerHTML = `
   <form class="${getClassName('popover-form')}">
-    <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything then hit enter"></textarea>
+    <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything"></textarea>
     <div>
       <select id="${getClassName('select-ask')}" name="llm"></select>
       <button id="${getClassName('btn-ask')}" type="submit">
@@ -73,6 +74,52 @@ function positionPopover(range) {
   popover.style.left = `${left}px`;
 }
 
+
+
+function loadResponse(responses) {
+  if (!responses.length) return;
+
+  const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].rangeData;
+  
+  const startNode = findNodeByPath(startContainerPath);
+  const endNode = findNodeByPath(endContainerPath);
+  const range = document.createRange();
+  range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
+  range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
+  
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  console.log(selection)
+  let ret = insertParentToSelection(selection)
+  appendResponseLink(ret, responses[0].id)
+  appendResponseBox(responses[0].id, responses[0].conversationURL, responses[0].response)
+}
+
+function findNodeByPath(path) {
+  let current = document.body;
+  for (let index of path) {
+    current = current.childNodes[index];
+  }
+  return current; // Fallback to element if no text node
+}
+
+function getElementPath(node) {
+  const path = [];
+  let current = node; // Don’t jump to parentElement yet
+  console.log(current.parentElement.childNodes)
+  while (current) {
+    if (current.tagName === "BODY") break
+    console.log("current:" + JSON.stringify(current))
+    const index = Array.prototype.indexOf.call(current.parentElement.childNodes, current);
+    console.log("index: " + index)
+    path.unshift(index);
+    current = current.parentElement;
+  }
+  return path;
+}
+
+let rangeData = null
 // Listen for keydown events
 document.addEventListener("keydown", (event) => {
   chrome.storage.sync.get("shortcut", (data) => {
@@ -91,18 +138,24 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault();
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
-          console.log(selection)
           let range = selection.getRangeAt(0)
+          console.log(range.startContainer)
+          rangeData = {
+            startContainerPath: getElementPath(range.startContainer),
+            startOffset: range.startOffset,
+            endContainerPath: getElementPath(range.endContainer),
+            endOffset: range.endOffset
+          }; 
+          insertParentToSelection(selection) 
           popover.classList.add(getClassName("open"))
           positionPopover(range);
-          let span = document.createElement("span");
-          span.className = getClassName(["selection"]);
+          
           let input = popover.querySelector("textarea")
           input.focus()
-      
-          let extractedContents = range.extractContents();
-          span.appendChild(extractedContents);
-          range.insertNode(span);
+          
+          console.log(rangeData)
+
+          
 
           chrome.runtime.sendMessage({ type: "LLM_INFO" }, function(llms){
             let llmDropdown = popover.querySelector("select")
@@ -120,6 +173,18 @@ document.addEventListener("keydown", (event) => {
     }
   });
 });
+
+function insertParentToSelection(selection){
+  let range = selection.getRangeAt(0)
+  let span = document.createElement("span");
+  span.className = getClassName(["selection"]);
+  let extractedContents = range.extractContents();
+  span.appendChild(extractedContents);
+  range.insertNode(span);
+  selection.removeAllRanges();
+  return span
+}
+
 let form = document.querySelector("."+getClassName("popover-form"))
 let textarea = popover.querySelector("textarea")
 
@@ -139,59 +204,68 @@ form.addEventListener('submit', function (evt) {
   popover.classList.remove(getClassName('open'))
   this.reset()
   console.log(llm)
-  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm}}, function(res){
+  chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm, rangeData}}, function(res){
     let {id, status} = res
     console.log(`id: ${id} - status ${status}`)
     if(status === 'failure') return
     if (selection.textContent.length > 0){
-      let link = document.createElement("a");
-      link.href=`#`
-      link.className = `${getClassName(['link-'+id, "loading"])}`;
-      link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
-          <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
-            <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
-            <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
-          </circle>
-        </svg>]`;
-      link.addEventListener("click", (e) => {
-        e.preventDefault(); // Prevent default link behavior
-        console.log("here")
-        let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
-        if (responseCnt){
-          responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
-          if(!responseCnt.classList.contains("hidden"))
-            mermaid.run({ querySelector: ".mermaid" }); 
-        }
-        
-      });
-      // Append the spinner inside the annotation span
-      selection.appendChild(link);
-      selection.classList.remove(getClassName("selection"))
-      selection.classList.add(getClassName('request-'+id))
-    } 
+      appendResponseLink(selection, id)
+    }
+      
   })
 });
 
+function appendResponseLink(selection, id){
+  let link = document.createElement("a");
+  link.href=`#`
+  link.className = `${getClassName(['link-'+id, "loading"])}`;
+  link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
+      <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
+        <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+        <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
+      </circle>
+    </svg>]`;
+  link.addEventListener("click", (e) => {
+    e.preventDefault(); // Prevent default link behavior
+    console.log("here")
+    let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
+    if (responseCnt){
+      responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
+      if(!responseCnt.classList.contains("hidden"))
+        mermaid.run({ querySelector: ".mermaid" }); 
+    }
+    
+  });
+  // Append the spinner inside the annotation span
+  selection.appendChild(link);
+  selection.classList.remove(getClassName("selection"))
+  selection.classList.add(getClassName('request-'+id))
+}
+
+function appendResponseBox(id, conversationURL, response){
+  let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
+  let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
+  pendingLink.innerHTML=`[${links.length}]`
+  let responseCnt = document.createElement("div");
+  responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
+  responseCnt.innerHTML = `
+    <a href="${conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
+  `
+  let md = renderMarkdown(response)
+  responseCnt.innerHTML += md
+  if(pendingLink){
+    pendingLink.parentNode.appendChild(responseCnt);
+    pendingLink.classList.remove(getClassName('loading'));
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "LLM_RESPONSE") {
     console.log(msg.payload)
     const {id, response, conversationURL} = msg.payload
-    let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-    let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
-    pendingLink.innerHTML=`[${links.length}]`
-    let responseCnt = document.createElement("div");
-    responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
-    responseCnt.innerHTML = `
-      <a href="${conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
-    `
-    let md = renderMarkdown(response)
-    responseCnt.innerHTML += md
-    if(pendingLink){
-      pendingLink.parentNode.appendChild(responseCnt);
-      pendingLink.classList.remove(getClassName('loading'));
-    }
+    appendResponseBox(id, conversationURL, response)
   }
+
   if (msg.type === "LLM_TIMEOUT") {
     const { id } = msg.payload
     let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
@@ -199,4 +273,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     pendingLink.classList.remove(getClassName("loading"))
   }
     
+});
+
+
+window.addEventListener('load', () => {
+  // Check if service worker is supported and active
+  chrome.runtime.sendMessage({ type: "LOAD_PAGE" }, function(res){
+    console.log("PAGE loaded")
+    console.log(res)
+    loadResponse(res.requests)
+  }) 
 });

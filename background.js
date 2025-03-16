@@ -9,7 +9,7 @@ class Request {
     requestsCreated: 0,
   };
 
-  constructor(llm, question, selectedText, senderId) {
+  constructor(llm, question, selectedText, senderId, senderURL, rangeData) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
     this.response = null;
@@ -21,6 +21,8 @@ class Request {
     this.status = "pending"
     this.timeoutId = null
     this.senderId = senderId
+    this.senderURL = senderURL
+    this.rangeData = rangeData
 
     // Store instance in static state
     Request.state.data.push(this);
@@ -49,7 +51,7 @@ class Request {
 }
 
 class LLM {
-  constructor(name, domain, send, useDebugger = false) {
+  constructor(name, domain, send, useDebugger = false, mockResponse=false) {
     this.name = name;
     this.domain = domain;
     this.lastUsed = null;
@@ -60,17 +62,26 @@ class LLM {
     this.useDebugger = useDebugger;
     this.debuggerAttached = false;
     this.processRequest = send;
+    this.mockResponse = mockResponse;
   }
 
   send() {
     if (DEBUG) {
-      console.log(
-        `${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n 
-         Prompt: ${this.currentRequest.getBody()} \n 
-         ITEMS IN QUEUE: ${this.queue.length}`
-      );
+      console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
     }
-    this.processRequest(this);
+    if (this.mockResponse) {
+      setTimeout(() => {
+        this.currentRequest.saveResponse("# Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#') 
+        chrome.tabs.sendMessage(this.currentRequest.senderId, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
+        this.processing = false
+        this.currentRequest = null
+        this.processQueue()
+      }, 2000)
+      
+    } else {
+      this.processRequest(this);
+    } 
+
   }
 
   async getURL() {
@@ -118,7 +129,7 @@ class LLM {
 }
 
 
-const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT)]
+const llms = [new LLM('grok', 'grok.com', grok, true, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
@@ -142,11 +153,11 @@ console.log(llmsMap)
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, selectedText, llm} = payload
+    const { question, selectedText, llm, rangeData} = payload
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender.tab.id);
+    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, rangeData);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
     sendResponse({ id: req.id, status: req.status})
@@ -168,6 +179,12 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
 
   if(type === "LLM_INFO") {
     sendResponse(llms.filter(llm => llm.tabId).sort((a,b) => b.lastUsed - a.lastUsed))
+  }
+
+  if(type === "LOAD_PAGE") {
+    console.log(sender)
+    let requests = Request.getAllRequests().filter(req => req.senderURL === sender.url)
+    sendResponse({requests})
   }
 
 });
