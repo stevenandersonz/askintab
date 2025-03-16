@@ -30,8 +30,7 @@ let debuggerTimeoutId = null
 // GROK needs to setup a debuger due to evt.isTrusted check
 export async function grok(llm){
   const {tabId, currentRequest, name} = llm
-  const basePrompt = await llm.getPrompt()
-  const prompt = currentRequest.annotation.getPrompt(basePrompt)
+  const prompt = await llm.getPrompt(currentRequest.getBody())
   if(!llm.debuggerAttached && llm.useDebugger){
     await chrome.debugger.attach({ tabId }, "1.3")
     if(DEBUG) console.log(`ATTACHED DEBUGGER @ TAB: ${tabId}`)
@@ -69,14 +68,12 @@ export async function grok(llm){
         //let ret = await sendDebuggerCommand(tabId,"Network.getResponseBody",{ requestId: targetRequestId })
         if (ret) {
           if(typeof ret.body !== 'string') return
-          let {annotation, timeoutId, senderId} = currentRequest
+          let {timeoutId, senderId} = currentRequest
           clearTimeout(timeoutId)
           const conversationURL = await llm.getURL()
-          annotation.save(parseResponseBody(ret.body), conversationURL) 
-  
+          currentRequest.saveResponse(parseResponseBody(ret.body), conversationURL) 
           if(DEBUG) console.log(`${name.toUpperCase()} - REQUEST COMPLETED`)
-          const {response, submittedAt} = annotation.state.data[annotation.state.data.length-1]
-          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", raw: response, id: submittedAt, conversationURL  }); 
+          chrome.tabs.sendMessage(senderId, { type: "LLM_RESPONSE", payload: currentRequest}); 
           llm.processing = false
           llm.currentRequest = null
           targetRequestId=null

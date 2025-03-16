@@ -29,9 +29,9 @@ function watchForResponse (conversationURL, DEBUG){
 if (DEBUG) console.log("IMPORTING CHATGPT")
 export async function chatGPT(llm){
   const {tabId, currentRequest} = llm
-  const basePrompt = await llm.getPrompt()
+  const prompt = await llm.getPrompt(currentRequest.getBody())
   const conversationURL = await llm.getURL()
-  await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, currentRequest.annotation.getPrompt(basePrompt)], func: selectAndWriteTextArea})
+  await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
   if(DEBUG) console.log('PROMPT SET INTO TEXTAREA')
   await chrome.scripting.executeScript({target: {tabId}, args: [conversationURL, DEBUG], func: watchForResponse})
   if(DEBUG) console.log('SETTING OBSERVER')

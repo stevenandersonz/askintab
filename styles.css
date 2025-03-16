@@ -6,16 +6,17 @@
 }
 
 [class^="companion-response"] {
-  max-width: 500px;
+  /* max-width: 500px; */
   width: 100%;
   border-radius: 10px;
   padding: 20px;
-  position: relative;
+  /* position: relative; */
   margin-top: 20px;
   font-size: 14px;
   line-height: 1.5;
-  box-sizing: border-box;
-  overflow: hidden;
+  display: hidden;
+  /* box-sizing: border-box; */
+  /* overflow: hidden; */
 }
 
 .companion-dark {
@@ -63,7 +64,7 @@
   font-size: 14px;
 }
 
-.companion-popover.open {
+.companion-open {
   opacity: 1;
   visibility: visible;
 }
@@ -138,20 +139,6 @@
   background-color: rgba(0, 120, 215, 0.3);
 }
 
-.companion-annotation-box {
-  /* dark background */
-  border: solid #2a2a2a 1px;
-  padding: 12px 16px;
-  margin-top: 10px;
-  font-size: 14px;
-  font-weight: 300;
-  line-height: 1.4;
-  /* light gray text for readability */
-  line-height: 1.6;
-  width: 100%;
-  box-shadow: 2px 2px 8px rgba(255, 255, 255, 0.1);
-  /* soft shadow for depth */
-}
 
 .companion-hidden {
   display: none;

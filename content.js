@@ -44,7 +44,7 @@ popover.innerHTML = `
 
 document.addEventListener('click', (e) => {
   if (!popover.contains(e.target)) {
-    popover.classList.remove('open');
+    popover.classList.remove(getClassName('open'));
     let sel = document.querySelector("."+getClassName("selection"))
     if (sel) sel.classList.remove(getClassName("selection"))
   }
@@ -93,7 +93,7 @@ document.addEventListener("keydown", (event) => {
         if (selection.rangeCount > 0) {
           console.log(selection)
           let range = selection.getRangeAt(0)
-          popover.classList.toggle("open")
+          popover.classList.add(getClassName("open"))
           positionPopover(range);
           let span = document.createElement("span");
           span.className = getClassName(["selection"]);
@@ -136,11 +136,10 @@ form.addEventListener('submit', function (evt) {
   let question = formData.get("question");
   let llm = formData.get("llm");
   let selection = document.querySelector(`.${getClassName('selection')}`);
-  popover.classList.remove('open') 
+  popover.classList.remove(getClassName('open'))
   this.reset()
   console.log(llm)
   chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm}}, function(res){
-    console.log(res)
     let {id, status} = res
     console.log(`id: ${id} - status ${status}`)
     if(status === 'failure') return
@@ -158,10 +157,12 @@ form.addEventListener('submit', function (evt) {
         e.preventDefault(); // Prevent default link behavior
         console.log("here")
         let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
-        if (responseCnt) {
-            responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
-            return;
+        if (responseCnt){
+          responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
+          if(!responseCnt.classList.contains("hidden"))
+            mermaid.run({ querySelector: ".mermaid" }); 
         }
+        
       });
       // Append the spinner inside the annotation span
       selection.appendChild(link);
@@ -171,27 +172,29 @@ form.addEventListener('submit', function (evt) {
   })
 });
 
-chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
-  if (response.type === "LLM_RESPONSE") {
-    console.log(response)
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "LLM_RESPONSE") {
+    console.log(msg.payload)
+    const {id, response, conversationURL} = msg.payload
     let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-    let pendingLink = document.querySelector('.'+getClassName(`link-${response.id}`));
+    let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
     pendingLink.innerHTML=`[${links.length}]`
     let responseCnt = document.createElement("div");
-    responseCnt.className = getClassName(['response-'+response.id, "hidden", getColorMode()])
+    responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
     responseCnt.innerHTML = `
-      <a href="${response.conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
+      <a href="${conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
     `
-    responseCnt.innerHTML += renderMarkdown(response.raw)
+    let md = renderMarkdown(response)
+    responseCnt.innerHTML += md
     if(pendingLink){
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
     }
-    
-    mermaid.run({ querySelector: ".mermaid" }); 
   }
-  if (response.type === "LLM_TIMEOUT") {
-    let pendingLink = document.querySelector('.'+getClassName(`link-${response.id}`));
+  if (msg.type === "LLM_TIMEOUT") {
+    const { id } = msg.payload
+    let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
     pendingLink.innerText = `[retry]`;
     pendingLink.classList.remove(getClassName("loading"))
   }
