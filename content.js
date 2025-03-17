@@ -4,7 +4,7 @@ const askInTabExt = (() => {
   //---  
   const EXT_NAME = "companion"
   let savedRange = null
-
+  let focusedElement = null
   //---
   //UTILS
   //---
@@ -61,6 +61,30 @@ const askInTabExt = (() => {
     }; 
   }
 
+  function getFocusedEditableElement() {
+    const activeElement = document.activeElement;
+    if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') return activeElement;
+    if (activeElement.isContentEditable) return activeElement;
+    return null;
+  }
+
+  function getContentEditableCursorInfo() {
+    const activeElement = document.activeElement;
+    if (activeElement && activeElement.isContentEditable) {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        return {
+          element: activeElement,
+          range: range,
+          isCollapsed: range.collapsed, // True if cursor, false if selection
+          rect: range.getBoundingClientRect()
+        };
+      }
+    }
+    return null;
+  }
+
   //---
   // DOM MANIPULATION
   //---  
@@ -108,12 +132,32 @@ const askInTabExt = (() => {
     let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
     pendingLink.innerHTML=`[${links.length}]`
     let responseCnt = document.createElement("div");
+    let mdCnt = document.createElement("div");
+    mdCnt.style="width:100%"
+    let editLink = document.createElement("a");
+    editLink.classList.add(getClassName("link"))
+    editLink.style="align-self:flex-start"
+    editLink.innerHTML = "Edit"
+    editLink.addEventListener('click', async () => {
+      editLink.classList.toggle(getClassName("link-edit"))
+      if(editLink.classList.contains(getClassName("link-edit"))){
+        editLink.innerHTML="Save"
+        mdCnt.classList.add(getClassName("edit-response"))
+        mdCnt.contentEditable=true
+        return mdCnt.innerHTML = response
+      } else {
+        let ret = await chrome.runtime.sendMessage({type: "PUT_RESPONSE", payload:{ update:mdCnt.innerHTML, id}})
+        console.log(ret)
+        mdCnt.innerHTML = renderMarkdown(ret.response) 
+        mdCnt.classList.remove(getClassName("edit-response"))
+      }   
+    })
+
     responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
-    responseCnt.innerHTML = `
-      <a href="${conversationURL}" target="_blank" rel="noopener noreferrer" class="${getClassName("llm-link")}">See in LLM</a>
-    `
     let md = renderMarkdown(response)
-    responseCnt.innerHTML += md
+    mdCnt.innerHTML = md
+    responseCnt.appendChild(editLink)
+    responseCnt.appendChild(mdCnt)
     if(pendingLink){
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
@@ -122,8 +166,8 @@ const askInTabExt = (() => {
 
   function loadResponse(responses) {
     if (!responses.length) return;
-  
-    const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].rangeData;
+    console.log(responses)
+    const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
     
     const startNode = findNodeByPath(startContainerPath);
     const endNode = findNodeByPath(endContainerPath);
@@ -226,23 +270,31 @@ const askInTabExt = (() => {
             let range = selection.getRangeAt(0)
             saveRange(range)
             insertParentToSelection(selection) 
-
             positionPopover(range, popover);
-            popover.classList.add(getClassName("open"))
+          }
 
-            let input = popover.querySelector("textarea")
-            input.focus()
+          //only works if editable not with inputs
+          let editableElement = getFocusedEditableElement()
+          if (editableElement){
+            focusedElement = editableElement
+            positionPopover(editableElement, popover); 
+          }
 
-            let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
-            let llmDropdown = popover.querySelector("select")
-            llmDropdown.innerHTML = ""
-            for(let llm of llms){
-              let option = document.createElement("option")
-              option.value = llm.name
-              option.innerHTML = llm.name
-              llmDropdown.appendChild(option)
-            }
-          } 
+          popover.classList.add(getClassName("open"))
+
+          let input = popover.querySelector("textarea")
+          input.focus()
+
+          let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
+          let llmDropdown = popover.querySelector("select")
+          llmDropdown.innerHTML = ""
+          for(let llm of llms){
+            let option = document.createElement("option")
+            option.value = llm.name
+            option.innerHTML = llm.name
+            llmDropdown.appendChild(option)
+          }
+
         } 
       }
     });
@@ -262,11 +314,20 @@ const askInTabExt = (() => {
       let selection = document.querySelector(`.${getClassName('selection')}`);
       popover.classList.remove(getClassName('open'))
       this.reset()
-      let ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm, savedRange}})
-      if(ret.status === 'failure') return
-      if (selection.textContent.length > 0){
-        appendResponseLink(selection, ret.id)
+      let ret; 
+      if(focusedElement){
+        console.log("sending focus")
+        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: "", llm, savedRange}})
       }
+      else{
+        console.log("sending normarl")
+        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm, savedRange}})
+        if (selection.textContent.length > 0){
+          appendResponseLink(selection, ret.id)
+        }
+      }
+      if(ret.status === 'failure') return
+      
     });
 
   }
@@ -275,7 +336,14 @@ const askInTabExt = (() => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
         const {id, response, conversationURL} = msg.payload
-        appendResponseBox(id, conversationURL, response)
+        if (focusedElement){
+          console.log("focuse")
+          let mdCnt = document.querySelector("."+getClassName("edit-response"))
+          mdCnt.innerHTML += response
+        } else {
+          console.log(" not focuse")
+          appendResponseBox(id, conversationURL, response)
+        } 
       }
     
       if (msg.type === "LLM_TIMEOUT") {

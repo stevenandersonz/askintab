@@ -1,6 +1,6 @@
 import {grok, chatGPT} from"./llms/index.js"
 
-const DEBUG = true
+const DEBUG = false
 const TIMEOUT_AFTER = 1000*60*10
 
 class Request {
@@ -9,7 +9,7 @@ class Request {
     requestsCreated: 0,
   };
 
-  constructor(llm, question, selectedText, senderId, senderURL, rangeData) {
+  constructor(llm, question, selectedText, senderId, senderURL, savedRange) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
     this.response = null;
@@ -22,7 +22,7 @@ class Request {
     this.timeoutId = null
     this.senderId = senderId
     this.senderURL = senderURL
-    this.rangeData = rangeData
+    this.savedRange =savedRange 
 
     // Store instance in static state
     Request.state.data.push(this);
@@ -76,7 +76,7 @@ class LLM {
         this.processing = false
         this.currentRequest = null
         this.processQueue()
-      }, 2000)
+      }, 1000)
       
     } else {
       this.processRequest(this);
@@ -153,11 +153,11 @@ console.log(llmsMap)
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, selectedText, llm, rangeData} = payload
+    const { question, selectedText, llm, savedRange} = payload
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, rangeData);
+    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
     sendResponse({ id: req.id, status: req.status})
@@ -175,6 +175,17 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     llm.processing = false
     llm.currentRequest = null
     llm.processQueue()
+  }
+
+  if(type === "PUT_RESPONSE") {
+    console.log("this")
+    console.log(payload)
+    let request = Request.getAllRequests().filter(req => req.id === payload.id)
+    if(request.length === 0) console.log("FOUND NO MATCH")
+    request[0].response = payload.update  
+    console.log("new response")
+    console.log(request[0].response)
+    sendResponse({response: request[0].response})
   }
 
   if(type === "LLM_INFO") {
