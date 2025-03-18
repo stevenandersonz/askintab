@@ -15,7 +15,8 @@
 [x] fix styles for updating responses
 [x] support ranges in update responses
 [x] support input responses
-[] support references
+[x] support editable element responses
+[] support grok without a debugger 
 [] add error handling 
 [] retry link support for when request timeout 
 
