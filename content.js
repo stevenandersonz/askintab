@@ -8,6 +8,14 @@ const askInTabExt = (() => {
   //---
   //UTILS
   //---
+  function getContentWithLineBreaks(element) {
+    return element.innerHTML
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?(div|p)[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+  }
+
   function getClassName(className){
     if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
     if(typeof className === 'string') return EXT_NAME + '-' + className
@@ -131,37 +139,62 @@ const askInTabExt = (() => {
     let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
     let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
     pendingLink.innerHTML=`[${links.length}]`
+
     let responseCnt = document.createElement("div");
+
     let mdCnt = document.createElement("div");
-    mdCnt.style="width:100%"
-    let editLink = document.createElement("a");
-    editLink.classList.add(getClassName("link"))
-    editLink.style="align-self:flex-start"
-    editLink.innerHTML = "Edit"
-    editLink.addEventListener('click', async () => {
-      editLink.classList.toggle(getClassName("link-edit"))
-      if(editLink.classList.contains(getClassName("link-edit"))){
-        editLink.innerHTML="Save"
-        mdCnt.classList.add(getClassName("edit-response"))
-        mdCnt.contentEditable=true
-        return mdCnt.innerHTML = response
+    mdCnt.classList.add(getClassName("md-content"))
+
+    let mdEdit = document.createElement("textarea");
+    mdEdit.className=getClassName("md-edit")
+
+    let responseMode = document.createElement("a");
+    responseMode.className = getClassName(["link", "edit-mode"])
+    responseMode.innerHTML = "Edit"
+    responseMode.addEventListener('click', async () => {
+      let clsMode = getClassName(["edit-mode", "save-mode"]).split(" ")
+      let isEditMode = responseMode.classList.contains(getClassName("edit-mode"))
+      if (isEditMode) {
+        const width = mdCnt.offsetWidth;
+        const height = mdCnt.offsetHeight;
+        // Set mdEdit dimensions to match mdCnt
+        mdEdit.style.width = `${width}px`;
+        mdEdit.style.height = `${height}px`;
+        responseMode.textContent = "Save";
+        responseMode.classList.replace(clsMode[0], clsMode[1]);
+        responseCnt.removeChild(mdCnt);           // Remove mdCnt
+        responseCnt.appendChild(mdEdit); 
+        mdEdit.value = response;
       } else {
-        let ret = await chrome.runtime.sendMessage({type: "PUT_RESPONSE", payload:{ update:mdCnt.innerHTML, id}})
-        console.log(ret)
-        mdCnt.innerHTML = renderMarkdown(ret.response) 
-        mdCnt.classList.remove(getClassName("edit-response"))
-      }   
+        console.log(mdEdit.value)
+        let ret = await chrome.runtime.sendMessage({
+          type: "PUT_RESPONSE",
+          payload: { 
+              update: mdEdit.value, 
+              id 
+          }
+        });
+        response = ret.response
+        console.log(response)
+        responseMode.textContent = "Edit";
+        responseMode.classList.replace(clsMode[1], clsMode[0]);
+        mdCnt.innerHTML = renderMarkdown(response);
+        responseCnt.removeChild(mdEdit);           // Remove mdCnt
+        responseCnt.appendChild(mdCnt); 
+      } 
+      isEditMode = !isEditMode;
     })
 
     responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
     let md = renderMarkdown(response)
     mdCnt.innerHTML = md
-    responseCnt.appendChild(editLink)
+    responseCnt.appendChild(responseMode)
     responseCnt.appendChild(mdCnt)
     if(pendingLink){
       pendingLink.parentNode.appendChild(responseCnt);
       pendingLink.classList.remove(getClassName('loading'));
     }
+
   }
 
   function loadResponse(responses) {
@@ -248,7 +281,9 @@ const askInTabExt = (() => {
         popover.classList.remove(getClassName('open'));
         let sel = document.querySelector("."+getClassName("selection"))
         if (sel) sel.classList.remove(getClassName("selection"))
+        return 
       }
+
     });
     
     document.addEventListener("keydown", async (event) => {
@@ -338,8 +373,13 @@ const askInTabExt = (() => {
         const {id, response, conversationURL} = msg.payload
         if (focusedElement){
           console.log("focuse")
-          let mdCnt = document.querySelector("."+getClassName("edit-response"))
-          mdCnt.innerHTML += response
+          let mdEdit = focusedElement  
+          const cursorPos = mdEdit.selectionStart; // Get current cursor position
+          const currentValue = mdEdit.value;
+          const limiter = "\n\n --- \n\n"
+          mdEdit.value = currentValue.slice(0, cursorPos) + limiter + response + limiter +currentValue.slice(cursorPos);
+          mdEdit.selectionStart = mdEdit.selectionEnd = cursorPos + response.length + 1;
+          mdEdit.value += "\n" + response
         } else {
           console.log(" not focuse")
           appendResponseBox(id, conversationURL, response)

@@ -11,7 +11,10 @@
 [x] improve ux
 [x] support base prompt as text file per llm 
 [x] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
-[] save/load annotations after page reload
+[x] save/load annotations after page reload
+[x] fix styles for updating responses
+[x] support ranges in update responses
+[x] support input responses
 [] support references
 [] add error handling 
 [] retry link support for when request timeout 
