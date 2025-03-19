@@ -29,7 +29,7 @@ class Request {
     Request.state.requestsCreated++;
   }
 
-  getBody() {
+  getPrompt() {
     return `${this.question} \n ${this.selectedText}`;
   }
 
@@ -90,19 +90,6 @@ class LLM {
     return tab.url;
   }
 
-  async getPrompt(text) {
-    const url = chrome.runtime.getURL(`data/${this.name}-prompt.txt`);
-    console.log(url);
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Failed to load ${url}`);
-      let basePrompt = await response.text();
-      return basePrompt + "\n\n" + text
-    } catch (error) {
-      console.error(error);
-      return null;
-    }
-  }
 
   processQueue() {
     if (this.processing || this.queue.length === 0) return;
@@ -129,7 +116,7 @@ class LLM {
 }
 
 
-const llms = [new LLM('grok', 'grok.com', grok, true, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
+const llms = [new LLM('grok', 'grok.com', grok, true, false), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms

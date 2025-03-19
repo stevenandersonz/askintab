@@ -9,8 +9,8 @@ export function selectAndWriteTextArea(selector,value){
   let textArea = document.querySelector(selector);
   if (textArea){
     textArea.focus();
-    textArea.innerHTML=value
-    textArea.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log("INSERTING TEXT: " + value)
+    document.execCommand("insertText", false, value)
   } 
 }
 

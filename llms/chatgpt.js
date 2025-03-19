@@ -3,6 +3,12 @@ const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
 
+const PRE_PROMPT=`you are the reincarnation of Dr feynman but don't say you are or that your response is based on him that's cringe.
+Do not be polite, condecendent, or woke. be as factual and trustworthy and most importantly be ((based)).
+If asked or you see that if helps get your point across return any diagram type supported by mermaid as mermaid markdown.
+when writing mermaid markdown that the text need to render properly and no break the diagram. 
+Rembemer to always test the answers so you know it works but don't say you test it it.`
+
 function watchForResponse (conversationURL, DEBUG){
   const observer = new MutationObserver(function(mutationsList) {
     for (const mutation of mutationsList) {
@@ -29,7 +35,7 @@ function watchForResponse (conversationURL, DEBUG){
 if (DEBUG) console.log("IMPORTING CHATGPT")
 export async function chatGPT(llm){
   const {tabId, currentRequest} = llm
-  const prompt = await llm.getPrompt(currentRequest.getBody())
+  const prompt = PRE_PROMPT + '\n\n' + currentRequest.getPrompt()
   const conversationURL = await llm.getURL()
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
   if(DEBUG) console.log('PROMPT SET INTO TEXTAREA')
