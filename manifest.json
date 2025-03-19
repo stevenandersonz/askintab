@@ -6,13 +6,10 @@
     "tabs",
     "scripting",
     "activeTab",
-    "debugger",
-    "storage",
-    "downloads"
+    "storage"
   ],
   "host_permissions": [
-    "<all_urls>",
-    "https://chatgpt.com/*" 
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
@@ -31,9 +28,5 @@
       "js": ["libs/mermaid.min.js","libs/marked.min.js","content.js"],
       "run_at": "document_end"
     }
-  ],
-  "web_accessible_resources": [{
-    "resources": ["data/*.txt"],
-    "matches": ["<all_urls>"]
-  }]
+  ]
 }
