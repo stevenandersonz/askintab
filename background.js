@@ -17,6 +17,7 @@ class Request {
     this.responseAt = null;
     this.question = question;
     this.conversationURL = null;
+    this.followUps = [];
     this.llm = llm;
     this.status = "pending"
     this.timeoutId = null
@@ -33,11 +34,12 @@ class Request {
     return `${this.question} \n ${this.selectedText}`;
   }
 
-  saveResponse(response, conversationURL) {
+  saveResponse(response, conversationURL, followUps) {
     this.response = response;
     this.responseAt = Date.now();
     this.conversationURL = conversationURL;
     this.status = "completed"
+    this.followUps = followUps
   }
 
   static getAllRequests() {
@@ -71,7 +73,7 @@ class LLM {
     }
     if (this.mockResponse) {
       setTimeout(() => {
-        this.currentRequest.saveResponse("# Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#') 
+        this.currentRequest.saveResponse("# Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ["Can you expand more?", "explain like i'm 5", "Ask myself"]) 
         chrome.tabs.sendMessage(this.currentRequest.senderId, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
         this.processing = false
         this.currentRequest = null
@@ -116,7 +118,7 @@ class LLM {
 }
 
 
-const llms = [new LLM('grok', 'grok.com', grok, true, false), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
+const llms = [new LLM('grok', 'grok.com', grok, true, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
@@ -154,7 +156,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     console.log(`RESPONSE FROM ${payload.llm}`)
     let llm = llmsMap[payload.llm] 
     clearTimeout(llm.currentRequest)
-    llm.currentRequest.saveResponse(payload.raw, payload.conversationURL)
+    llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
     chrome.tabs.sendMessage(llm.currentRequest.senderId, { type: "LLM_RESPONSE", payload: llm.currentRequest }); 
 

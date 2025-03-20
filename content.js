@@ -5,6 +5,59 @@ const askInTabExt = (() => {
   const EXT_NAME = "companion"
   let savedRange = null
   let focusedElement = null
+
+
+  //---
+  // UI
+  //--- 
+  const highlight = document.createElement("span");
+  highlight.className = getClassName(["selection"]);
+
+  const spinner = `<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
+  <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
+    <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
+  </circle>
+  </svg>`
+
+  const requestLink = document.createElement("a");
+  requestLink.href=`#`
+  requestLink.className = `${getClassName(['link', 'loading'])}`;
+  requestLink.innerHTML = `[${spinner}]`;
+
+  const popover = document.createElement('div');
+  popover.classList = getClassName('popover')
+  popover.innerHTML = `
+    <form class="${getClassName('popover-form')}">
+      <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything"></textarea>
+      <div class="${getClassName('cnt-ask')}">
+        <select id="${getClassName('select-ask')}" name="llm"></select>
+        <button id="${getClassName('btn-ask')}" type="submit">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
+        </button>
+      </div>
+    </form>
+  `;
+  const form = popover.querySelector("form")
+  const textarea = popover.querySelector("textarea")
+
+  //response UI
+  const questionEl = document.createElement("h3")
+  questionEl.className = getClassName("question")
+
+  const mdCnt = document.createElement("div");
+  mdCnt.classList.add(getClassName("md-content"))
+
+  const followUpsCnt = document.createElement("div"); 
+  followUpsCnt.classList.add(getClassName("followups-cnt"))
+
+  const responseCnt = document.createElement("div");
+  responseCnt.className = getClassName(['response-cnt', "hidden", getColorMode(), "quote"])
+  responseCnt.appendChild(questionEl)
+  responseCnt.appendChild(mdCnt)
+  responseCnt.appendChild(followUpsCnt)
+
+
   //---
   //UTILS
   //---
@@ -97,124 +150,81 @@ const askInTabExt = (() => {
   // DOM MANIPULATION
   //---  
 
-  function insertParentToSelection(selection, el="span"){
+
+  function createHighlight(selection, id="pending"){
     let range = selection.getRangeAt(0)
-    el = document.createElement(el);
-    el.className = getClassName(["selection"]);
+    clonedHighlight = highlight.cloneNode()
+    clonedHighlight.id = getClassName("request-"+id)
     let extractedContents = range.extractContents();
-    el.appendChild(extractedContents);
-    range.insertNode(el);
+    clonedHighlight.appendChild(extractedContents);
+    range.insertNode(clonedHighlight);
     selection.removeAllRanges();
-    return el
+    return clonedHighlight 
   }
 
-  function appendResponseLink(selection, id){
-    let link = document.createElement("a");
-    link.href=`#`
-    link.className = `${getClassName(['link-'+id, "loading"])}`;
-    link.innerHTML = `[<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
-        <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
-          <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
-          <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
-        </circle>
-      </svg>]`;
-
-    link.addEventListener("click", (e) => {
+  function createLink(){
+    let link = requestLink.cloneNode(true)
+    link.addEventListener("click", function(e){
       e.preventDefault(); // Prevent default link behavior
-      let responseCnt = document.querySelector(`.${getClassName('response-'+id)}`) 
-      if (responseCnt){
+      let responseCnt = this.nextElementSibling
+      if (responseCnt && responseCnt.tagName === "DIV"){
         responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
         if(!responseCnt.classList.contains("hidden"))
           mermaid.run({ querySelector: ".mermaid" }); 
       }
-      
     });
+    return link
 
-    selection.appendChild(link);
-    selection.classList.remove(getClassName("selection"))
-    selection.classList.add(getClassName('request-'+id))
+    
   }
   
-  function appendResponseBox(id, conversationURL, response){
-    let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-    let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
-    pendingLink.innerHTML=`[${links.length}]`
+  
+  function createResponseCnt(req){
+    let newResponseCnt = responseCnt.cloneNode(true);
+    newResponseCnt.children[0].innerText = req.question
+    newResponseCnt.children[1].innerHTML = renderMarkdown(req.response) 
 
-    let responseCnt = document.createElement("div");
+    for(let fu of req.followUps){
+      let btn = document.createElement("button")
+      btn.className = getClassName("followup-btn") 
+      btn.innerText = fu
+      newResponseCnt.children[2].appendChild(btn)
 
-    let mdCnt = document.createElement("div");
-    mdCnt.classList.add(getClassName("md-content"))
-
-    let mdEdit = document.createElement("textarea");
-    mdEdit.className=getClassName("md-edit")
-
-    let responseMode = document.createElement("a");
-    responseMode.className = getClassName(["link", "edit-mode"])
-    responseMode.innerHTML = "Edit"
-    responseMode.addEventListener('click', async () => {
-      let clsMode = getClassName(["edit-mode", "save-mode"]).split(" ")
-      let isEditMode = responseMode.classList.contains(getClassName("edit-mode"))
-      if (isEditMode) {
-        const width = mdCnt.offsetWidth;
-        const height = mdCnt.offsetHeight;
-        // Set mdEdit dimensions to match mdCnt
-        mdEdit.style.width = `${width}px`;
-        mdEdit.style.height = `${height}px`;
-        responseMode.textContent = "Save";
-        responseMode.classList.replace(clsMode[0], clsMode[1]);
-        responseCnt.removeChild(mdCnt);           // Remove mdCnt
-        responseCnt.appendChild(mdEdit); 
-        mdEdit.value = response;
-      } else {
-        console.log(mdEdit.value)
-        let ret = await chrome.runtime.sendMessage({
-          type: "PUT_RESPONSE",
-          payload: { 
-              update: mdEdit.value, 
-              id 
-          }
-        });
-        response = ret.response
-        console.log(response)
-        responseMode.textContent = "Edit";
-        responseMode.classList.replace(clsMode[1], clsMode[0]);
-        mdCnt.innerHTML = renderMarkdown(response);
-        responseCnt.removeChild(mdEdit);           // Remove mdCnt
-        responseCnt.appendChild(mdCnt); 
-      } 
-      isEditMode = !isEditMode;
+    }
+    newResponseCnt.addEventListener("click", async (evt) => {
+      if (evt.target.tagName === "BUTTON"){
+        let ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question: evt.target.textContent, selectedText: "", llm: req.llm, savedRange: null}})
+        let clone = mdCnt.cloneNode(false)
+        clone.classList.add(getClassName("loading"))
+        clone.innerHTML = spinner
+        clone.id = getClassName("request-"+ret.id)
+        newResponseCnt.lastChild.before(clone)
+      }
     })
 
-    responseCnt.className = getClassName(['response-'+id, "hidden", getColorMode()])
-    let md = renderMarkdown(response)
-    mdCnt.innerHTML = md
-    responseCnt.appendChild(responseMode)
-    responseCnt.appendChild(mdCnt)
-    if(pendingLink){
-      pendingLink.parentNode.appendChild(responseCnt);
-      pendingLink.classList.remove(getClassName('loading'));
-    }
-
+    return newResponseCnt
   }
 
-  function loadResponse(responses) {
-    if (!responses.length) return;
-    console.log(responses)
-    const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
+  // function loadResponse(responses) {
+  //   if (!responses.length) return;
+  //   console.log(responses)
+  //   const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
     
-    const startNode = findNodeByPath(startContainerPath);
-    const endNode = findNodeByPath(endContainerPath);
-    const range = document.createRange();
-    range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
-    range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
+  //   const startNode = findNodeByPath(startContainerPath);
+  //   const endNode = findNodeByPath(endContainerPath);
+  //   const range = document.createRange();
+  //   range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
+  //   range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
     
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-    let ret = insertParentToSelection(selection)
-    appendResponseLink(ret, responses[0].id)
-    appendResponseBox(responses[0].id, responses[0].conversationURL, responses[0].response)
-  }
+  //   const selection = window.getSelection();
+  //   selection.removeAllRanges();
+  //   selection.addRange(range);
+  //   let highlight = createHighlight(selection, responses[0].id)
+  //   let link = createLink(responses[0].id)
+  //   highlight.appendChild(link);
+  //   highlight.classList.remove(getClassName("selection"))
+  //   appendResponseBox(responses[0].id, responses[0].conversationURL, responses[0].response)
+  // }
 
   function positionPopover(range, popover) {
     const rect = range.getBoundingClientRect();
@@ -237,29 +247,6 @@ const askInTabExt = (() => {
     popover.style.left = `${left}px`;
   }
 
-
-
-  //---
-  // UI
-  //--- 
-  const popover = document.createElement('div');
-  popover.classList = getClassName('popover')
-  popover.innerHTML = `
-    <form class="${getClassName('popover-form')}">
-      <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything"></textarea>
-      <div class="${getClassName('cnt-ask')}">
-        <select id="${getClassName('select-ask')}" name="llm"></select>
-        <button id="${getClassName('btn-ask')}" type="submit">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
-        </button>
-      </div>
-    </form>
-  `;
-  let form = popover.querySelector("form")
-  let textarea = popover.querySelector("textarea")
-
-
-
   // Initialization
   function init(){
     mermaid.initialize({ startOnLoad: true });
@@ -269,12 +256,10 @@ const askInTabExt = (() => {
   };
 
   function setupEventListeners(){
-
-    console.log("here")
-    window.addEventListener('load', async () => {
-      let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
-      if(res.requests.length > 0) loadResponse(res.requests)
-    });
+    // window.addEventListener('load', async () => {
+    //   let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
+    //   if(res.requests.length > 0) loadResponse(res.requests)
+    // });
     
     document.addEventListener('click', (e) => {
       if (!popover.contains(e.target)) {
@@ -304,7 +289,7 @@ const askInTabExt = (() => {
           if (selection.rangeCount > 0) {
             let range = selection.getRangeAt(0)
             saveRange(range)
-            insertParentToSelection(selection) 
+            createHighlight(selection) 
             positionPopover(range, popover);
           }
 
@@ -346,7 +331,7 @@ const askInTabExt = (() => {
       let formData = new FormData(this); // Collects form data
       let question = formData.get("question");
       let llm = formData.get("llm");
-      let selection = document.querySelector(`.${getClassName('selection')}`);
+      let highlight = document.querySelector(`#${getClassName('request-pending')}`);
       popover.classList.remove(getClassName('open'))
       this.reset()
       let ret; 
@@ -356,9 +341,12 @@ const askInTabExt = (() => {
       }
       else{
         console.log("sending normarl")
-        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: selection.textContent, llm, savedRange}})
-        if (selection.textContent.length > 0){
-          appendResponseLink(selection, ret.id)
+        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: highlight.textContent, llm, savedRange}})
+        if (highlight.textContent.length > 0){
+          highlight.id = getClassName("request-" + ret.id)
+          let link = createLink(ret.id)
+          highlight.appendChild(link);
+          highlight.classList.remove(getClassName("selection"))
         }
       }
       if(ret.status === 'failure') return
@@ -366,24 +354,34 @@ const askInTabExt = (() => {
     });
 
   }
+
   function setupChromeRuntimeListeners(){
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
-        const {id, response, conversationURL} = msg.payload
-        if (focusedElement){
-          console.log("focuse")
-          let mdEdit = focusedElement  
-          const cursorPos = mdEdit.selectionStart; // Get current cursor position
-          const currentValue = mdEdit.value;
-          const limiter = "\n\n --- \n\n"
-          mdEdit.value = currentValue.slice(0, cursorPos) + limiter + response + limiter +currentValue.slice(cursorPos);
-          mdEdit.selectionStart = mdEdit.selectionEnd = cursorPos + response.length + 1;
-          mdEdit.value += "\n" + response
-        } else {
-          console.log(" not focuse")
-          appendResponseBox(id, conversationURL, response)
-        } 
+        let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
+        console.log(req)
+        if(req) {
+          if (req.tagName === "SPAN"){
+            let pendingLink = req.querySelector("a")
+            console.log(pendingLink)
+            let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
+            pendingLink.innerHTML=`[${links.length}]`
+            let newResponseCnt = createResponseCnt(msg.payload)
+            pendingLink.parentElement.appendChild(newResponseCnt)
+          }
+        
+          if (req.tagName === 'DIV'){
+            req.innerHTML = renderMarkdown(msg.payload.response)
+            fuCnt = req.nextElementSibling
+            for (let i = 0; i < msg.payload.followUps.length; i++){
+              fuCnt.children[i].innerText = msg.payload.followUps[i]
+            }
+            req.classList.remove(getClassName('loading'));
+          }
+          
+          
+        }
       }
     
       if (msg.type === "LLM_TIMEOUT") {

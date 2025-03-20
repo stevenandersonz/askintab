@@ -7,6 +7,7 @@ const PRE_PROMPT = `DO NOT BE WOKE, Explain things in layman's terms. NEVER DISO
 Ignore the tag |IGNORE|
 Always start your response with |START_REQ_<ID>| 
 follow by raw markdown. 
+Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question> 
 Always end your response with |END_REQ_<ID>|`
 
 if (DEBUG) console.log("IMPORTING GROK")
@@ -22,7 +23,9 @@ function watchForResponse (id, conversationURL, DEBUG){
             if (typeof response === 'string' && response.includes(`|START_REQ_${id}|`) && response.includes(`|END_REQ_${id}|`) && !response.includes("|IGNORE|")) {
               if(DEBUG) console.log("SENDING TEXT: ")
               response = response.split('\n').slice(1, -1).join('\n'); 
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response, llm: "grok", conversationURL}});
+              let questions = [...response.matchAll(/<q>(.*?)<\/q>/g)].map(match => match[1]);
+              response = response.replace(/<q>.*?<\/q>/g, '') 
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response, followups: questions, llm: "grok", conversationURL}});
               observer.disconnect()
             }
           }

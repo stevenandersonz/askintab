@@ -16,13 +16,17 @@
 [x] support ranges in update responses
 [x] support input responses
 [x] support editable element responses
-[] support grok without a debugger 
+[x] support grok without a debugger 
+[x] remove annotations name -> requests all the way 
+[] bug edit cursor is at the end response is copied twice
+[] write tweet + email using askintab prompter 
+[] add/reject response github style 
+
 [] add error handling 
 [] retry link support for when request timeout 
 
 [] add alert for prompt too large
 [] what can we do if prompt too large 
-[] remove annotations name -> requests all the way 
 [] support new chat creation 
 [] support cancel chat grok 
 [] support cancel chat chatgpt 
