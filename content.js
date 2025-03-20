@@ -286,7 +286,9 @@ const askInTabExt = (() => {
         if (pressedKeys.join(" + ") === shortcut) {
           event.preventDefault();
           const selection = window.getSelection();
-          if (selection.rangeCount > 0) {
+          console.log("range count: ")
+          console.log(selection.rangeCount)
+          if (selection.rangeCount > 1) {
             let range = selection.getRangeAt(0)
             saveRange(range)
             createHighlight(selection) 
@@ -335,8 +337,10 @@ const askInTabExt = (() => {
       popover.classList.remove(getClassName('open'))
       this.reset()
       let ret; 
-      if(focusedElement){
+      console.log(highlight)
+      if(!highlight && focusedElement){
         console.log("sending focus")
+        console.log(focusedElement)
         ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: "", llm, savedRange}})
       }
       else{
@@ -359,6 +363,16 @@ const askInTabExt = (() => {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
+        if(focusedElement){
+          let pasteEvent = new ClipboardEvent("paste", {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: new DataTransfer()
+          });
+          pasteEvent.clipboardData.setData("text/plain", msg.payload.response); 
+          document.activeElement.dispatchEvent(pasteEvent)
+          return
+        }
         let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
         console.log(req)
         if(req) {
