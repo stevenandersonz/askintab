@@ -9,7 +9,7 @@ class Request {
     requestsCreated: 0,
   };
 
-  constructor(llm, question, selectedText, senderId, senderURL, savedRange) {
+  constructor(llm, question, selectedText, senderId, senderURL, savedRange, type, id) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
     this.response = null;
@@ -22,12 +22,21 @@ class Request {
     this.status = "pending"
     this.timeoutId = null
     this.senderId = senderId
+    this.type = type
     this.senderURL = senderURL
-    this.savedRange =savedRange 
+    this.savedRange = savedRange 
+    this.conversation = []
 
     // Store instance in static state
     Request.state.data.push(this);
     Request.state.requestsCreated++;
+    if(type==="FOLLOWUP"){
+      console.log(id)
+      let ret = Request.findById(id)
+      console.log("adding chat to ")
+      console.log(ret)
+      if(ret) ret.conversation.push(this.id)
+    }
   }
 
   getPrompt() {
@@ -44,6 +53,13 @@ class Request {
 
   static getAllRequests() {
     return this.state.data;
+  }
+  static findById(id) {
+    console.log(this.state.data)
+    let ret = this.state.data.filter(r => r.id===id)
+    console.log("here")
+    console.log(ret)
+    return ret.length === 1 ? ret[0]: null;
   }
 
   static getRequestCount() {
@@ -142,11 +158,11 @@ console.log(llmsMap)
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, selectedText, llm, savedRange} = payload
+    const { question, selectedText, llm, savedRange, type:requestType, requestId} = payload
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange);
+    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange, requestType, requestId);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
     sendResponse({ id: req.id, status: req.status})
@@ -156,6 +172,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     console.log(`RESPONSE FROM ${payload.llm}`)
     let llm = llmsMap[payload.llm] 
     clearTimeout(llm.currentRequest)
+
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
     chrome.tabs.sendMessage(llm.currentRequest.senderId, { type: "LLM_RESPONSE", payload: llm.currentRequest }); 
@@ -166,15 +183,20 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     llm.processQueue()
   }
 
-  if(type === "PUT_RESPONSE") {
-    console.log("this")
-    console.log(payload)
-    let request = Request.getAllRequests().filter(req => req.id === payload.id)
-    if(request.length === 0) console.log("FOUND NO MATCH")
-    request[0].response = payload.update  
-    console.log("new response")
-    console.log(request[0].response)
-    sendResponse({response: request[0].response})
+  if(type === "DOWNLOAD") {
+    let conversation = [] 
+    let initRequest = Request.getAllRequests().filter(req => req.type === "INIT_CONVERSATION")
+    for (let req of initRequest){
+      conversation.push(`--- \n origin: ${req.senderURL} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n asked: ${req.question}\n responded: ${req.response} \n`)
+      for (let cId of req.conversation){
+        let ret = Request.findById(cId)
+        conversation.push(`asked: ${ret.question} \n responded: ${ret.response} \n`)
+      }
+    }
+    console.log(conversation)
+    console.log(conversation.join("\n"))
+    sendResponse(conversation.join("\n"))
+    
   }
 
   if(type === "LLM_INFO") {

@@ -61,13 +61,7 @@ const askInTabExt = (() => {
   //---
   //UTILS
   //---
-  function getContentWithLineBreaks(element) {
-    return element.innerHTML
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/?(div|p)[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .trim();
-  }
+
 
   function getClassName(className){
     if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -129,23 +123,6 @@ const askInTabExt = (() => {
     return null;
   }
 
-  function getContentEditableCursorInfo() {
-    const activeElement = document.activeElement;
-    if (activeElement && activeElement.isContentEditable) {
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        return {
-          element: activeElement,
-          range: range,
-          isCollapsed: range.collapsed, // True if cursor, false if selection
-          rect: range.getBoundingClientRect()
-        };
-      }
-    }
-    return null;
-  }
-
   //---
   // DOM MANIPULATION
   //---  
@@ -193,7 +170,9 @@ const askInTabExt = (() => {
     }
     newResponseCnt.addEventListener("click", async (evt) => {
       if (evt.target.tagName === "BUTTON"){
-        let ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question: evt.target.textContent, selectedText: "", llm: req.llm, savedRange: null}})
+        let parentId = newResponseCnt.parentElement.id.split('-').pop()
+        console.log("parent ID: " + parentId)
+        let ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question: evt.target.textContent, selectedText: "", llm: req.llm, savedRange: null, type:"FOLLOWUP", requestId:Number(parentId)}})
         let clone = mdCnt.cloneNode(false)
         clone.classList.add(getClassName("loading"))
         clone.innerHTML = spinner
@@ -204,6 +183,24 @@ const askInTabExt = (() => {
 
     return newResponseCnt
   }
+  async function openPopover(){
+            console.log("here 2")
+    popover.classList.add(getClassName("open"))
+    console.log(popover)
+    let input = popover.querySelector("textarea")
+    input.focus()
+
+    let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
+    let llmDropdown = popover.querySelector("select")
+    llmDropdown.innerHTML = ""
+    for(let llm of llms){
+      let option = document.createElement("option")
+      option.value = llm.name
+      option.innerHTML = llm.name
+      llmDropdown.appendChild(option)
+    }
+  }
+  
 
   // function loadResponse(responses) {
   //   if (!responses.length) return;
@@ -288,35 +285,27 @@ const askInTabExt = (() => {
           const selection = window.getSelection();
           console.log("range count: ")
           console.log(selection.rangeCount)
-          if (selection.rangeCount > 1) {
+          if (selection.rangeCount === 1) {
             let range = selection.getRangeAt(0)
+            if (range.startOffset === range.endOffset){
+              let editableElement = getFocusedEditableElement()
+              if (editableElement){
+                focusedElement = editableElement
+                positionPopover(editableElement, popover); 
+                openPopover()
+              }
+              return
+            } 
+            console.log("here 1")
             saveRange(range)
             createHighlight(selection) 
             positionPopover(range, popover);
+            openPopover()
+            return
           }
 
           //only works if editable not with inputs
-          let editableElement = getFocusedEditableElement()
-          if (editableElement){
-            focusedElement = editableElement
-            positionPopover(editableElement, popover); 
-          }
-
-          popover.classList.add(getClassName("open"))
-
-          let input = popover.querySelector("textarea")
-          input.focus()
-
-          let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
-          let llmDropdown = popover.querySelector("select")
-          llmDropdown.innerHTML = ""
-          for(let llm of llms){
-            let option = document.createElement("option")
-            option.value = llm.name
-            option.innerHTML = llm.name
-            llmDropdown.appendChild(option)
-          }
-
+          
         } 
       }
     });
@@ -341,11 +330,11 @@ const askInTabExt = (() => {
       if(!highlight && focusedElement){
         console.log("sending focus")
         console.log(focusedElement)
-        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: "", llm, savedRange}})
+        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: "", llm, savedRange, type:"STANDALONE"}})
       }
       else{
         console.log("sending normarl")
-        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: highlight.textContent, llm, savedRange}})
+        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: highlight.textContent, llm, savedRange, type: "INIT_CONVERSATION"}})
         if (highlight.textContent.length > 0){
           highlight.id = getClassName("request-" + ret.id)
           let link = createLink(ret.id)
