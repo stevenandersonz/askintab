@@ -12,7 +12,6 @@ class Request {
   constructor(llm, question, selectedText, senderId, senderURL, savedRange, type, parentId=null) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
-    this.response = null;
     this.createdAt = Date.now();
     this.responseAt = null;
     this.question = question;
@@ -43,12 +42,11 @@ class Request {
   }
 
   saveResponse(response, conversationURL, followUps) {
-    this.response = response;
     this.responseAt = Date.now();
     this.conversationURL = conversationURL;
     this.status = "completed"
     this.followUps = followUps
-    this.raw = `### ${this.question} \n ${this.response}`
+    this.raw = `### ${this.question} \n ${response}`
   }
 
   static getAllRequests() {
