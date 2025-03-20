@@ -185,13 +185,12 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     let conversation = [] 
     let initRequest = Request.getAllRequests().filter(req => req.type === "INIT_CONVERSATION")
     for (let req of initRequest){
-      conversation.push(`--- \n origin: ${req.senderURL} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n asked: ${req.question}\n responded: ${req.response} \n`)
+      conversation.push(`--- \n origin: ${req.senderURL} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n ${req.raw}`)
       for (let cId of req.conversation){
         let ret = Request.findById(cId)
-        conversation.push(`asked: ${ret.question} \n responded: ${ret.response} \n`)
+        conversation.push(ret.raw)
       }
     }
-    console.log(conversation)
     console.log(conversation.join("\n"))
     sendResponse(conversation.join("\n"))
     

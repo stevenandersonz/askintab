@@ -326,6 +326,7 @@ const askInTabExt = (() => {
       let llm = formData.get("llm");
       let parentReqId = formData.get("parentReqId");
       let highlight = document.querySelector(`#${getClassName('request-pending')}`);
+      console.log(formData)
       form.querySelectorAll("input, textarea").forEach(input => input.value = "");
       popover.classList.remove(getClassName('open'))
       this.reset()
@@ -352,12 +353,16 @@ const askInTabExt = (() => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
         if(msg.payload.type === "STANDALONE" && focusedElement){
+          console.log("HEREEEEE")
           let pasteEvent = new ClipboardEvent("paste", {
             bubbles: true,
             cancelable: true,
             clipboardData: new DataTransfer()
           });
-          pasteEvent.clipboardData.setData("text/plain", msg.payload.response); 
+          console.log(document.activeElement)
+          console.log(focusedElement)
+          pasteEvent.clipboardData.setData("text/plain", msg.payload.raw); 
+          focusedElement.focus()
           document.activeElement.dispatchEvent(pasteEvent)
           return
         }
