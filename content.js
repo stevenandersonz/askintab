@@ -6,7 +6,6 @@ const askInTabExt = (() => {
   let savedRange = null
   let focusedElement = null
 
-
   //---
   // UI
   //--- 
@@ -42,6 +41,7 @@ const askInTabExt = (() => {
   `;
   const form = popover.querySelector("form")
   const textarea = popover.querySelector("textarea")
+  const select = popover.querySelector("select")
 
   //response UI
   const questionEl = document.createElement("h3")
@@ -73,7 +73,6 @@ const askInTabExt = (() => {
   function renderMarkdown(payload){
     const renderer = new marked.Renderer();
     renderer.code = (tokens) => {
-      console.log(tokens)
       if (tokens.lang === "mermaid") {
         return `<div class="mermaid">${tokens.text}</div>`;
       }
@@ -153,8 +152,6 @@ const askInTabExt = (() => {
       }
     });
     return link
-
-    
   }
   
   function createResponseCnt(req){
@@ -177,8 +174,7 @@ const askInTabExt = (() => {
         positionPopover(evt.target, popover)
         openPopover("FOLLOWUP", Number(parentId))
         if(evt.target.textContent.toUpperCase() !== "I want to ask something else".toUpperCase()){
-          clone.innerHTML = spinner
-          popover.querySelector("button").click()
+          textarea.value = evt.target.textContent 
         }
         return
       }
@@ -187,9 +183,9 @@ const askInTabExt = (() => {
 
     return newResponseCnt
   }
-  async function openPopover(reqType, parentReqId){
+
+  async function openPopover(reqType, parentReqId=null){
     popover.classList.add(getClassName("open"))
-    console.log(popover)
     let input = popover.querySelector("textarea")
     input.focus()
 
@@ -202,48 +198,41 @@ const askInTabExt = (() => {
       option.innerHTML = llm.name
       llmDropdown.appendChild(option)
     }
-    popover.querySelector("input[name='reqType']").value=reqType
-    popover.querySelector("input[name='parentReqId']").value=parentReqId
+    popover.querySelector("input[name='reqType']").value = reqType
+    popover.querySelector("input[name='parentReqId']").value = parentReqId
   }
   
-
-  // function loadResponse(responses) {
-  //   if (!responses.length) return;
-  //   console.log(responses)
-  //   const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
+  function loadResponse(responses) {
+    if (!responses.length) return;
+    console.log(responses)
+    const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
     
-  //   const startNode = findNodeByPath(startContainerPath);
-  //   const endNode = findNodeByPath(endContainerPath);
-  //   const range = document.createRange();
-  //   range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
-  //   range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
+    const startNode = findNodeByPath(startContainerPath);
+    const endNode = findNodeByPath(endContainerPath);
+    const range = document.createRange();
+    range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
+    range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
     
-  //   const selection = window.getSelection();
-  //   selection.removeAllRanges();
-  //   selection.addRange(range);
-  //   let highlight = createHighlight(selection, responses[0].id)
-  //   let link = createLink(responses[0].id)
-  //   highlight.appendChild(link);
-  //   highlight.classList.remove(getClassName("selection"))
-  //   appendResponseBox(responses[0].id, responses[0].conversationURL, responses[0].response)
-  // }
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    let highlight = createHighlight(selection, responses[0].id)
+    let link = createLink(responses[0].id)
+    highlight.appendChild(link);
+    highlight.classList.remove(getClassName("selection"))
+    createResponseCnt(responses[0])
+  }
 
   function positionPopover(range, popover) {
     const rect = range.getBoundingClientRect();
     const popoverWidth = popover.offsetWidth;
   
-    // Position below selection, centered with selection midpoint
     let top = rect.bottom + window.scrollY + 10;
     let selectionMidpoint = rect.left + (rect.width / 2);
     let left = selectionMidpoint - (popoverWidth / 2) + window.scrollX;
   
-    // Boundary checks
-    if (left < 10) {
-        left = 10;
-    }
-    if (left + popoverWidth > window.innerWidth - 10) {
-        left = window.innerWidth - popoverWidth - 10;
-    }
+    if (left < 10) left = 10;
+    if (left + popoverWidth > window.innerWidth - 10) left = window.innerWidth - popoverWidth - 10;
   
     popover.style.top = `${top}px`;
     popover.style.left = `${left}px`;
@@ -258,10 +247,10 @@ const askInTabExt = (() => {
   };
 
   function setupEventListeners(){
-    // window.addEventListener('load', async () => {
-    //   let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
-    //   if(res.requests.length > 0) loadResponse(res.requests)
-    // });
+    window.addEventListener('load', async () => {
+      let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
+      if(res.requests.length > 0) loadResponse(res.requests)
+    });
     
     document.addEventListener('click', (e) => {
       if (!popover.contains(e.target)) {
@@ -288,8 +277,6 @@ const askInTabExt = (() => {
         if (pressedKeys.join(" + ") === shortcut) {
           event.preventDefault();
           const selection = window.getSelection();
-          console.log("range count: ")
-          console.log(selection.rangeCount)
           if (selection.rangeCount === 1) {
             let range = selection.getRangeAt(0)
             if (range.startOffset === range.endOffset){
@@ -301,7 +288,6 @@ const askInTabExt = (() => {
               }
               return
             } 
-            console.log("here 1")
             saveRange(range)
             createHighlight(selection) 
             positionPopover(range, popover);
@@ -309,8 +295,6 @@ const askInTabExt = (() => {
             return
           }
 
-          //only works if editable not with inputs
-          
         } 
       }
     });
@@ -330,11 +314,10 @@ const askInTabExt = (() => {
       let llm = formData.get("llm");
       let parentReqId = formData.get("parentReqId");
       let highlight = document.querySelector(`#${getClassName('request-pending')}`);
+      form.querySelectorAll("input, textarea").forEach(input => input.value = "");
       popover.classList.remove(getClassName('open'))
       this.reset()
       let ret; 
-      console.log(highlight)
-      console.log(type)
       let payload=null
       if(type === "STANDALONE") payload = {question, llm, type} 
       if(type === "INIT_CONVERSATION") payload = {question, selectedText: highlight.textContent, llm, savedRange, type}
@@ -370,7 +353,6 @@ const askInTabExt = (() => {
         if(msg.payload.type === "INIT_CONVERSATION" ){
           let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
           let pendingLink = req.querySelector("a")
-          console.log(pendingLink)
           let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
           pendingLink.innerHTML=`[${links.length}]`
           let newResponseCnt = createResponseCnt(msg.payload)
@@ -380,17 +362,13 @@ const askInTabExt = (() => {
 
         if(msg.payload.type === "FOLLOWUP" ){
           let req = document.querySelector("#" + getClassName("request-" + msg.payload.parentId)) 
-          console.log(req)
           let mdCnt = req.querySelector("."+getClassName("loading"))
-          console.log("---")
-          console.log(mdCnt)
-          console.log("---")
+          mdCnt.classList.remove(getClassName('loading'));
           mdCnt.innerHTML = renderMarkdown(msg.payload.response)
           fuCnt = mdCnt.nextElementSibling
           for (let i = 0; i < msg.payload.followUps.length; i++){
             fuCnt.children[i].innerText = msg.payload.followUps[i]
           }
-          mdCnt.classList.remove(getClassName('loading'));
           return
         }
       }
