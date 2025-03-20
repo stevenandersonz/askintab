@@ -17,6 +17,7 @@ class Request {
     this.responseAt = null;
     this.question = question;
     this.conversationURL = null;
+    this.raw = null;
     this.parentId = parentId;
     this.followUps = [];
     this.llm = llm;
@@ -47,6 +48,7 @@ class Request {
     this.conversationURL = conversationURL;
     this.status = "completed"
     this.followUps = followUps
+    this.raw = `### ${this.question} \n ${this.response}`
   }
 
   static getAllRequests() {
@@ -87,7 +89,7 @@ class LLM {
     }
     if (this.mockResponse) {
       setTimeout(() => {
-        this.currentRequest.saveResponse("# Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ["Can you expand more?", "explain like i'm 5", "Ask myself"]) 
+        this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
         chrome.tabs.sendMessage(this.currentRequest.senderId, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
         this.processing = false
         this.currentRequest = null

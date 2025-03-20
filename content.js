@@ -41,12 +41,8 @@ const askInTabExt = (() => {
   `;
   const form = popover.querySelector("form")
   const textarea = popover.querySelector("textarea")
-  const select = popover.querySelector("select")
 
   //response UI
-  const questionEl = document.createElement("h3")
-  questionEl.className = getClassName("question")
-
   const mdCnt = document.createElement("div");
   mdCnt.classList.add(getClassName("md-content"))
 
@@ -55,7 +51,6 @@ const askInTabExt = (() => {
 
   const responseCnt = document.createElement("div");
   responseCnt.className = getClassName(['response-cnt', "hidden",  "quote"])
-  responseCnt.appendChild(questionEl)
   responseCnt.appendChild(mdCnt)
   responseCnt.appendChild(followUpsCnt)
 
@@ -156,14 +151,13 @@ const askInTabExt = (() => {
   
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
-    newResponseCnt.children[0].innerText = req.question
-    newResponseCnt.children[1].innerHTML = renderMarkdown(req.response) 
+    newResponseCnt.children[0].innerHTML = renderMarkdown(req.raw) 
 
     for(let fu of [...req.followUps, "I want to ask something else"]){
       let btn = document.createElement("button")
       btn.className = getClassName("followup-btn") 
       btn.innerText = fu
-      newResponseCnt.children[2].appendChild(btn)
+      newResponseCnt.children[1].appendChild(btn)
     }
     newResponseCnt.addEventListener("click", async (evt) => {
       if (evt.target.className === getClassName("followup-btn")){
@@ -205,22 +199,40 @@ const askInTabExt = (() => {
   function loadResponse(responses) {
     if (!responses.length) return;
     console.log(responses)
-    const { startContainerPath, startOffset, endContainerPath, endOffset} = responses[0].savedRange;
+    for (let r of responses){
+      if(r.type === "INIT_CONVERSATION"){
+        const { startContainerPath, startOffset, endContainerPath, endOffset} = r.savedRange;
+        const startNode = findNodeByPath(startContainerPath);
+        const endNode = findNodeByPath(endContainerPath);
+        const range = document.createRange();
+        range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
+        range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
+        
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        let highlight = createHighlight(selection, r.id)
+        let link = createLink(r.id)
+        highlight.appendChild(link);
+        highlight.classList.remove(getClassName("selection"))
+        highlight.appendChild(link)
+        link.innerHTML = `[${document.querySelectorAll("."+getClassName("link")).length}]`
+        let newResponseCnt = createResponseCnt(r)
+        highlight.appendChild(newResponseCnt)
+      }
+      if(r.type === "FOLLOWUP"){
+        let resCnt = document.querySelector("#" + getClassName("request-" + r.parentId)+" ."+getClassName("response-cnt")) 
+        console.log(resCnt)
+        let newMdCnt = mdCnt.cloneNode(false) 
+        newMdCnt.innerHTML = renderMarkdown(r.response)
+        resCnt.lastChild.before(newMdCnt)
+        fuCnt = newMdCnt.nextElementSibling
+        for (let i = 0; i < r.followUps.length; i++){
+          fuCnt.children[i].innerText = r.followUps[i]
+        }
+      }
+    }
     
-    const startNode = findNodeByPath(startContainerPath);
-    const endNode = findNodeByPath(endContainerPath);
-    const range = document.createRange();
-    range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
-    range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
-    
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-    let highlight = createHighlight(selection, responses[0].id)
-    let link = createLink(responses[0].id)
-    highlight.appendChild(link);
-    highlight.classList.remove(getClassName("selection"))
-    createResponseCnt(responses[0])
   }
 
   function positionPopover(range, popover) {
@@ -364,7 +376,7 @@ const askInTabExt = (() => {
           let req = document.querySelector("#" + getClassName("request-" + msg.payload.parentId)) 
           let mdCnt = req.querySelector("."+getClassName("loading"))
           mdCnt.classList.remove(getClassName('loading'));
-          mdCnt.innerHTML = renderMarkdown(msg.payload.response)
+          mdCnt.innerHTML = renderMarkdown(msg.payload.raw)
           fuCnt = mdCnt.nextElementSibling
           for (let i = 0; i < msg.payload.followUps.length; i++){
             fuCnt.children[i].innerText = msg.payload.followUps[i]

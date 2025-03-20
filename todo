@@ -22,7 +22,7 @@
 [x] added suggestion responses 
 [x] suport "ask myself box" + if response is open default prompter to there 
 [x] request over the same response should be linked 
-[x] write tweet + email using askintab prompter 
+[x] write tweet + email using askintab prompter
 
 [] add error handling 
 [] retry link support for when request timeout 
