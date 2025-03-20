@@ -18,9 +18,11 @@
 [x] support editable element responses
 [x] support grok without a debugger 
 [x] remove annotations name -> requests all the way 
-[] bug edit cursor is at the end response is copied twice
+[x] bug edit cursor is at the end response is copied twice
+[x] added suggestion responses 
+[] suport "ask myself box" + if response is open default prompter to there 
+[] request over the same response should be linked 
 [] write tweet + email using askintab prompter 
-[] add/reject response github style 
 
 [] add error handling 
 [] retry link support for when request timeout 
