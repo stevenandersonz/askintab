@@ -20,7 +20,7 @@
 [x] remove annotations name -> requests all the way 
 [x] bug edit cursor is at the end response is copied twice
 [x] added suggestion responses 
-[] suport "ask myself box" + if response is open default prompter to there 
+[x] suport "ask myself box" + if response is open default prompter to there 
 [x] request over the same response should be linked 
 [x] write tweet + email using askintab prompter 
 

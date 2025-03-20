@@ -11,7 +11,7 @@ const askInTabExt = (() => {
   // UI
   //--- 
   const highlight = document.createElement("span");
-  highlight.className = getClassName(["selection"]);
+  highlight.className = getClassName(["selection", getColorMode()]);
 
   const spinner = `<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
   <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
@@ -22,7 +22,7 @@ const askInTabExt = (() => {
 
   const requestLink = document.createElement("a");
   requestLink.href=`#`
-  requestLink.className = `${getClassName(['link', 'loading'])}`;
+  requestLink.className = `${getClassName(['link'])}`;
   requestLink.innerHTML = `[${spinner}]`;
 
   const popover = document.createElement('div');
@@ -35,6 +35,8 @@ const askInTabExt = (() => {
         <button id="${getClassName('btn-ask')}" type="submit">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
         </button>
+        <input type="hidden" name="reqType"></input>
+        <input type="hidden" name="parentReqId"></input>
       </div>
     </form>
   `;
@@ -52,7 +54,7 @@ const askInTabExt = (() => {
   followUpsCnt.classList.add(getClassName("followups-cnt"))
 
   const responseCnt = document.createElement("div");
-  responseCnt.className = getClassName(['response-cnt', "hidden", getColorMode(), "quote"])
+  responseCnt.className = getClassName(['response-cnt', "hidden",  "quote"])
   responseCnt.appendChild(questionEl)
   responseCnt.appendChild(mdCnt)
   responseCnt.appendChild(followUpsCnt)
@@ -155,36 +157,37 @@ const askInTabExt = (() => {
     
   }
   
-  
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
     newResponseCnt.children[0].innerText = req.question
     newResponseCnt.children[1].innerHTML = renderMarkdown(req.response) 
 
-    for(let fu of req.followUps){
+    for(let fu of [...req.followUps, "I want to ask something else"]){
       let btn = document.createElement("button")
       btn.className = getClassName("followup-btn") 
       btn.innerText = fu
       newResponseCnt.children[2].appendChild(btn)
-
     }
     newResponseCnt.addEventListener("click", async (evt) => {
-      if (evt.target.tagName === "BUTTON"){
+      if (evt.target.className === getClassName("followup-btn")){
         let parentId = newResponseCnt.parentElement.id.split('-').pop()
-        console.log("parent ID: " + parentId)
-        let ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question: evt.target.textContent, selectedText: "", llm: req.llm, savedRange: null, type:"FOLLOWUP", requestId:Number(parentId)}})
         let clone = mdCnt.cloneNode(false)
-        clone.classList.add(getClassName("loading"))
-        clone.innerHTML = spinner
-        clone.id = getClassName("request-"+ret.id)
         newResponseCnt.lastChild.before(clone)
+        clone.classList.add(getClassName("loading"))
+        positionPopover(evt.target, popover)
+        openPopover("FOLLOWUP", Number(parentId))
+        if(evt.target.textContent.toUpperCase() !== "I want to ask something else".toUpperCase()){
+          clone.innerHTML = spinner
+          popover.querySelector("button").click()
+        }
+        return
       }
+      
     })
 
     return newResponseCnt
   }
-  async function openPopover(){
-            console.log("here 2")
+  async function openPopover(reqType, parentReqId){
     popover.classList.add(getClassName("open"))
     console.log(popover)
     let input = popover.querySelector("textarea")
@@ -199,6 +202,8 @@ const askInTabExt = (() => {
       option.innerHTML = llm.name
       llmDropdown.appendChild(option)
     }
+    popover.querySelector("input[name='reqType']").value=reqType
+    popover.querySelector("input[name='parentReqId']").value=parentReqId
   }
   
 
@@ -260,7 +265,7 @@ const askInTabExt = (() => {
     
     document.addEventListener('click', (e) => {
       if (!popover.contains(e.target)) {
-        popover.classList.remove(getClassName('open'));
+        //popover.classList.remove(getClassName('open'));
         let sel = document.querySelector("."+getClassName("selection"))
         if (sel) sel.classList.remove(getClassName("selection"))
         return 
@@ -292,7 +297,7 @@ const askInTabExt = (() => {
               if (editableElement){
                 focusedElement = editableElement
                 positionPopover(editableElement, popover); 
-                openPopover()
+                openPopover("STANDALONE")
               }
               return
             } 
@@ -300,7 +305,7 @@ const askInTabExt = (() => {
             saveRange(range)
             createHighlight(selection) 
             positionPopover(range, popover);
-            openPopover()
+            openPopover("INIT_CONVERSATION")
             return
           }
 
@@ -321,29 +326,28 @@ const askInTabExt = (() => {
       evt.preventDefault();
       let formData = new FormData(this); // Collects form data
       let question = formData.get("question");
+      let type = formData.get("reqType");
       let llm = formData.get("llm");
+      let parentReqId = formData.get("parentReqId");
       let highlight = document.querySelector(`#${getClassName('request-pending')}`);
       popover.classList.remove(getClassName('open'))
       this.reset()
       let ret; 
       console.log(highlight)
-      if(!highlight && focusedElement){
-        console.log("sending focus")
-        console.log(focusedElement)
-        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: "", llm, savedRange, type:"STANDALONE"}})
+      console.log(type)
+      let payload=null
+      if(type === "STANDALONE") payload = {question, llm, type} 
+      if(type === "INIT_CONVERSATION") payload = {question, selectedText: highlight.textContent, llm, savedRange, type}
+      if(type === "FOLLOWUP") payload = {question, llm, type, parentReqId}
+
+      ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload })
+      if (type === "INIT_CONVERSATION" && highlight.textContent.length > 0){
+        highlight.id = getClassName("request-" + ret.id)
+        let link = createLink(ret.id)
+        highlight.appendChild(link);
+        highlight.classList.remove(getClassName("selection"))
       }
-      else{
-        console.log("sending normarl")
-        ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload: {question, selectedText: highlight.textContent, llm, savedRange, type: "INIT_CONVERSATION"}})
-        if (highlight.textContent.length > 0){
-          highlight.id = getClassName("request-" + ret.id)
-          let link = createLink(ret.id)
-          highlight.appendChild(link);
-          highlight.classList.remove(getClassName("selection"))
-        }
-      }
-      if(ret.status === 'failure') return
-      
+
     });
 
   }
@@ -352,7 +356,7 @@ const askInTabExt = (() => {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
-        if(focusedElement){
+        if(msg.payload.type === "STANDALONE" && focusedElement){
           let pasteEvent = new ClipboardEvent("paste", {
             bubbles: true,
             cancelable: true,
@@ -362,28 +366,32 @@ const askInTabExt = (() => {
           document.activeElement.dispatchEvent(pasteEvent)
           return
         }
-        let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
-        console.log(req)
-        if(req) {
-          if (req.tagName === "SPAN"){
-            let pendingLink = req.querySelector("a")
-            console.log(pendingLink)
-            let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-            pendingLink.innerHTML=`[${links.length}]`
-            let newResponseCnt = createResponseCnt(msg.payload)
-            pendingLink.parentElement.appendChild(newResponseCnt)
+
+        if(msg.payload.type === "INIT_CONVERSATION" ){
+          let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
+          let pendingLink = req.querySelector("a")
+          console.log(pendingLink)
+          let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
+          pendingLink.innerHTML=`[${links.length}]`
+          let newResponseCnt = createResponseCnt(msg.payload)
+          pendingLink.parentElement.appendChild(newResponseCnt)
+          return
+        } 
+
+        if(msg.payload.type === "FOLLOWUP" ){
+          let req = document.querySelector("#" + getClassName("request-" + msg.payload.parentId)) 
+          console.log(req)
+          let mdCnt = req.querySelector("."+getClassName("loading"))
+          console.log("---")
+          console.log(mdCnt)
+          console.log("---")
+          mdCnt.innerHTML = renderMarkdown(msg.payload.response)
+          fuCnt = mdCnt.nextElementSibling
+          for (let i = 0; i < msg.payload.followUps.length; i++){
+            fuCnt.children[i].innerText = msg.payload.followUps[i]
           }
-        
-          if (req.tagName === 'DIV'){
-            req.innerHTML = renderMarkdown(msg.payload.response)
-            fuCnt = req.nextElementSibling
-            for (let i = 0; i < msg.payload.followUps.length; i++){
-              fuCnt.children[i].innerText = msg.payload.followUps[i]
-            }
-            req.classList.remove(getClassName('loading'));
-          }
-          
-          
+          mdCnt.classList.remove(getClassName('loading'));
+          return
         }
       }
     

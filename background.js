@@ -9,7 +9,7 @@ class Request {
     requestsCreated: 0,
   };
 
-  constructor(llm, question, selectedText, senderId, senderURL, savedRange, type, id) {
+  constructor(llm, question, selectedText, senderId, senderURL, savedRange, type, parentId=null) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
     this.response = null;
@@ -17,6 +17,7 @@ class Request {
     this.responseAt = null;
     this.question = question;
     this.conversationURL = null;
+    this.parentId = parentId;
     this.followUps = [];
     this.llm = llm;
     this.status = "pending"
@@ -31,10 +32,7 @@ class Request {
     Request.state.data.push(this);
     Request.state.requestsCreated++;
     if(type==="FOLLOWUP"){
-      console.log(id)
-      let ret = Request.findById(id)
-      console.log("adding chat to ")
-      console.log(ret)
+      let ret = Request.findById(parentId)
       if(ret) ret.conversation.push(this.id)
     }
   }
@@ -158,11 +156,11 @@ console.log(llmsMap)
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
-    const { question, selectedText, llm, savedRange, type:requestType, requestId} = payload
+    const { question, selectedText, llm, savedRange, type:requestType, parentReqId} = payload
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange, requestType, requestId);
+    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange, requestType, parentReqId);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
     sendResponse({ id: req.id, status: req.status})
