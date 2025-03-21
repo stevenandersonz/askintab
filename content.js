@@ -1,15 +1,187 @@
 const askInTabExt = (() => {
+  const styles = `
+    .companion-link {
+      z-index: 1000;
+      text-decoration: underline;
+      cursor: pointer;
+      color: blue;
+    }
+    .companion-response-cnt {
+      position: relative;
+      margin: 15px 0;
+    }
+    .companion-quote::before {
+      content: '';
+      position: absolute;
+      left: -20px;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      border-radius: 5px;
+    }
+    .companion-followup-btn {
+      width: 100%;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      border-top: solid 1px #555;
+      background: transparent;
+    }
+    .companion-followup-btn:last-child {
+      border-bottom: solid 1px #555;
+    }
+    .companion-followups-cnt {
+      justify-content: center;
+      align-items: flex-start;
+      display: flex;
+      flex-direction: column;
+    }
+    .companion-dark { color: #ffffff; }
+    .companion-dark .companion-quote::before { background-color: rgba(255, 255, 255, 0.5); }
+    .companion-light .companion-quote::before { background-color: rgba(0, 0, 0, 0.5); }
+    .companion-dark .companion-followup-btn:hover { background-color: rgba(0, 0, 0, 0.1); }
+    .companion-light .companion-followup-btn:hover { background-color: rgba(168, 168, 168, 0.1); }
+    .companion-light { color: #010101; }
+    .companion-popover {
+      position: absolute;
+      background-color: #2c2c2e;
+      border-radius: 8px;
+      padding: 5px;
+      width: 400px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease-out;
+      z-index: 1000;
+      font-size: 14px;
+    }
+    .companion-open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .companion-popover::before {
+      content: '';
+      position: absolute;
+      width: 0;
+      height: 0;
+      border: 6px solid transparent;
+      border-bottom-color: #2c2c2e;
+      top: -12px;
+      left: calc(50% - 6px);
+    }
+    .companion-popover-form {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-block-end: 0px;
+    }
+
+    .companion-popover-close {
+      border: none;
+      background-color: transparent;
+      height: 15px;
+      width: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      padding: 0;
+      top: -3px; 
+      right: -2px;
+      position:absolute;
+    }
+
+    .companion-popover-close:hover {
+      border: 1px solid #3f3f41;
+      color: black;
+      border-radius: 8px;
+    }
+
+    .companion-cnt-ask {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      border-top: #3f3f41 solid 2px;
+      padding: 8px;
+    }
+    .companion-cnt-ask button {
+      align-self: center;
+      border: 1px solid #2c2c2e; /* Match the crew */
+      color: #000000; /* Black icon/text */
+      height: 30px;
+      width: 30px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif; /* Same font */
+      font-size: 16px; /* Slightly bigger for button */
+      cursor: pointer; /* Clickable vibe */
+      padding: 0; /* No extra fluff */
+    }
+
+    .companion-cnt-ask button { background-color: #c3c2c2; }
+
+    textarea {
+      width:100%;
+      color: white;
+      caret-color: white;
+      background-color: #2c2c2e; /* Match button bg for consistency */
+      border: 1px solid #2c2c2e; /* Clear border, no surprises */
+      border-radius: 4px; /* Soft corners */
+      font-family: Arial, sans-serif; /* Standard font */
+      font-size: 14px; /* Readable size */
+      line-height: 1.5; /* Nice spacing */
+      resize: vertical; /* Only stretch up/down */
+      min-height: 60px; /* Minimum size */
+    }
+
+    textarea:focus {
+      outline: none;
+    }
+
+    select {
+      background-color: #2c2c2e; /* Keep your dark vibe */
+      border: 1px solid #2c2c2e; /* Match textarea */
+      border-radius: 4px; /* Consistent corners */
+      padding: 8px; /* Same as textarea */
+      font-family: Arial, sans-serif; /* Same font */
+      font-size: 14px; /* Same size */
+      line-height: 1.5; /* Same spacing */
+      color: #ffffff; /* White text stays */
+      appearance: none; /* Kill browser defaults */
+      cursor: pointer; /* Feels clickable */
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>');
+      background-repeat: no-repeat;
+      background-position: right 8px center; /* Arrow on the right */
+      background-size: 12px; /*
+    }
+
+    .companion-md-content {
+      background-color: transparent;
+      padding: 0;
+      margin: 0;
+    }
+
+    .companion-md-content h1, h2, h3 {
+      font-weight: 600;
+      font-size: 1rem;
+      line-height: calc(0.25rem * 7);
+    }
+
+    .companion-hidden { display: none; }
+`
   //---
   // GLOBALS
   //---  
   const EXT_NAME = "companion"
   let savedRange = null
   let focusedElement = null
-  let waitingIntervalId = null
-
   //---
   // UI
   //--- 
+
   const highlight = document.createElement("span");
   highlight.className = getClassName(["selection", getColorMode()]);
 
@@ -25,14 +197,28 @@ const askInTabExt = (() => {
   requestLink.className = `${getClassName(['link'])}`;
   requestLink.innerHTML = `[${spinner}]`;
 
+  const shadowContainer = document.createElement('div');
+  shadowContainer.id = 'popover-shadow-container';
+
   const popover = document.createElement('div');
   popover.classList = getClassName('popover')
+
+  const shadowRoot = shadowContainer.attachShadow({ mode: 'open' });
+
+  const style = document.createElement("style")
+  style.textContent = styles
+
   popover.innerHTML = `
     <form class="${getClassName('popover-form')}">
-      <textarea id="${getClassName('textarea-ask')}" name="question" placeholder="ask anything"></textarea>
+      <div style="position: relative; width:100%;">
+      <button type="button" class="${getClassName('popover-close')}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+      </button>
+      <textarea name="question" placeholder="ask anything"></textarea>
+      </div>
       <div class="${getClassName('cnt-ask')}">
-        <select id="${getClassName('select-ask')}" name="llm"></select>
-        <button id="${getClassName('btn-ask')}" type="submit">
+        <select name="llm"></select>
+        <button type="submit">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
         </button>
         <input type="hidden" name="reqType"></input>
@@ -40,8 +226,16 @@ const askInTabExt = (() => {
       </div>
     </form>
   `;
+
+  shadowRoot.appendChild(style);
+  shadowRoot.appendChild(popover);
+
   const form = popover.querySelector("form")
+  const popoverCloseBtn = popover.querySelector("."+getClassName("popover-close"))
   const textarea = popover.querySelector("textarea")
+  const llmSelect = popover.querySelector("select")
+  const reqTypeInput = popover.querySelector("input[name='reqType']")
+  const parentReqIdInput = popover.querySelector("input[name='parentReqId']")
 
   //response UI
   const mdCnt = document.createElement("div");
@@ -187,7 +381,7 @@ const askInTabExt = (() => {
         let parentId = newResponseCnt.parentElement.id.split('-').pop()
         let clone = mdCnt.cloneNode(false)
         newResponseCnt.lastChild.before(clone)
-        positionPopover(evt.target, popover)
+        positionPopover(evt.target)
         openPopover("FOLLOWUP", Number(parentId))
         if(evt.target.textContent.toUpperCase() !== "I want to ask something else".toUpperCase()){
           textarea.value = evt.target.textContent 
@@ -201,22 +395,36 @@ const askInTabExt = (() => {
     return newResponseCnt
   }
 
+  function positionPopover(el) {
+    const rect = el.getBoundingClientRect();
+    const popoverWidth = popover.offsetWidth;
+  
+    let top = rect.bottom + window.scrollY + 10;
+    let selectionMidpoint = rect.left + (rect.width / 2);
+    let left = selectionMidpoint - (popoverWidth / 2) + window.scrollX;
+  
+    if (left < 10) left = 10;
+    if (left + popoverWidth > window.innerWidth - 10) left = window.innerWidth - popoverWidth - 10;
+  
+    shadowContainer.style.position = 'absolute';
+    shadowContainer.style.top = `${top}px`;
+    shadowContainer.style.left = `${left}px`; 
+  }
+
   async function openPopover(reqType, parentReqId=null){
     popover.classList.add(getClassName("open"))
-    let input = popover.querySelector("textarea")
-    input.focus()
+    textarea.focus()
 
     let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
-    let llmDropdown = popover.querySelector("select")
-    llmDropdown.innerHTML = ""
+    llmSelect.innerHTML = ""
     for(let llm of llms){
       let option = document.createElement("option")
       option.value = llm.name
       option.innerHTML = llm.name
-      llmDropdown.appendChild(option)
+      llmSelect.appendChild(option)
     }
-    popover.querySelector("input[name='reqType']").value = reqType
-    popover.querySelector("input[name='parentReqId']").value = parentReqId
+    reqTypeInput.value = reqType
+    parentReqIdInput.value = parentReqId
   }
   
   function loadResponse(responses) {
@@ -258,25 +466,12 @@ const askInTabExt = (() => {
     
   }
 
-  function positionPopover(range, popover) {
-    const rect = range.getBoundingClientRect();
-    const popoverWidth = popover.offsetWidth;
-  
-    let top = rect.bottom + window.scrollY + 10;
-    let selectionMidpoint = rect.left + (rect.width / 2);
-    let left = selectionMidpoint - (popoverWidth / 2) + window.scrollX;
-  
-    if (left < 10) left = 10;
-    if (left + popoverWidth > window.innerWidth - 10) left = window.innerWidth - popoverWidth - 10;
-  
-    popover.style.top = `${top}px`;
-    popover.style.left = `${left}px`;
-  }
+
 
   // Initialization
   function init(){
     mermaid.initialize({ startOnLoad: true });
-    document.body.appendChild(popover);
+    document.body.appendChild(shadowContainer);
     setupEventListeners();
     setupChromeRuntimeListeners()
   };
@@ -287,14 +482,11 @@ const askInTabExt = (() => {
       if(res.requests.length > 0) loadResponse(res.requests)
     });
     
-    document.addEventListener('click', (e) => {
-      if (!popover.contains(e.target)) {
-        //popover.classList.remove(getClassName('open'));
-        let sel = document.querySelector("."+getClassName("selection"))
-        if (sel) sel.classList.remove(getClassName("selection"))
-        return 
-      }
-
+    popoverCloseBtn.addEventListener('click', (e) => {
+      console.log("here")
+      popover.classList.remove(getClassName("open"))
+      let sel = document.querySelector("."+getClassName("selection"))
+      if (sel) sel.classList.remove(getClassName("selection"))
     });
     
     document.addEventListener("keydown", async (event) => {
@@ -426,7 +618,9 @@ const askInTabExt = (() => {
         
     });
   }
+  
   return {init}
+
 })()
 
 askInTabExt.init();

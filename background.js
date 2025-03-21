@@ -91,7 +91,7 @@ class LLM {
         this.processing = false
         this.currentRequest = null
         this.processQueue()
-      }, 3000)
+      }, 1000)
       
     } else {
       this.processRequest(this);
