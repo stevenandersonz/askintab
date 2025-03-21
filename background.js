@@ -16,7 +16,6 @@ class Request {
     this.responseAt = null;
     this.question = question;
     this.conversationURL = null;
-    this.raw = null;
     this.parentId = parentId;
     this.followUps = [];
     this.llm = llm;
@@ -27,6 +26,7 @@ class Request {
     this.senderURL = senderURL
     this.savedRange = savedRange 
     this.conversation = []
+    this.response = null
 
     // Store instance in static state
     Request.state.data.push(this);
@@ -46,7 +46,7 @@ class Request {
     this.conversationURL = conversationURL;
     this.status = "completed"
     this.followUps = followUps
-    this.raw = `### ${this.question} \n ${response}`
+    this.response = response
   }
 
   static getAllRequests() {
@@ -59,7 +59,7 @@ class Request {
     console.log(ret)
     return ret.length === 1 ? ret[0]: null;
   }
-
+  
   static getRequestCount() {
     return this.state.count;
   }
@@ -67,7 +67,7 @@ class Request {
 }
 
 class LLM {
-  constructor(name, domain, send, useDebugger = false, mockResponse=false) {
+  constructor(name, domain, send, mockResponse=false) {
     this.name = name;
     this.domain = domain;
     this.lastUsed = null;
@@ -75,7 +75,6 @@ class LLM {
     this.queue = [];
     this.processing = false;
     this.currentRequest = null;
-    this.useDebugger = useDebugger;
     this.debuggerAttached = false;
     this.processRequest = send;
     this.mockResponse = mockResponse;
@@ -92,7 +91,7 @@ class LLM {
         this.processing = false
         this.currentRequest = null
         this.processQueue()
-      }, 1000)
+      }, 3000)
       
     } else {
       this.processRequest(this);
@@ -132,7 +131,7 @@ class LLM {
 }
 
 
-const llms = [new LLM('grok', 'grok.com', grok, true, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false, true)]
+const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
@@ -170,6 +169,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     console.log(`RESPONSE FROM ${payload.llm}`)
     let llm = llmsMap[payload.llm] 
     clearTimeout(llm.currentRequest)
+    console.log(payload)
 
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
@@ -188,7 +188,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
       conversation.push(`--- \n origin: ${req.senderURL} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n ${req.raw}`)
       for (let cId of req.conversation){
         let ret = Request.findById(cId)
-        conversation.push(ret.raw)
+        conversation.push(`### ${ret.question} \n ${ret.response}`)
       }
     }
     console.log(conversation.join("\n"))

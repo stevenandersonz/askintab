@@ -5,6 +5,7 @@ const askInTabExt = (() => {
   const EXT_NAME = "companion"
   let savedRange = null
   let focusedElement = null
+  let waitingIntervalId = null
 
   //---
   // UI
@@ -58,7 +59,29 @@ const askInTabExt = (() => {
   //---
   //UTILS
   //---
+  function setPasteEvent(text){
+    let pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: new DataTransfer()
+    });
+    pasteEvent.clipboardData.setData("text/plain", text);
+    return pasteEvent
+  }
 
+  function setSpinner(){
+    const rect = focusedElement.getBoundingClientRect();
+    const spinnerCnt = document.createElement("div")
+    spinnerCnt.id = getClassName("waiting")
+    spinnerCnt.style.position = "absolute";
+    spinnerCnt.style.fontSize = '1.5rem';
+    spinnerCnt.style.left = `${rect.left}px`;
+    spinnerCnt.style.top = `${rect.top}px`; // above the element
+    spinnerCnt.style.zIndex = 10000 
+    spinnerCnt.innerHTML = spinner
+    document.body.appendChild(spinnerCnt);
+  }  
+  
 
   function getClassName(className){
     if(Array.isArray(className)) return className.map(cls => EXT_NAME + '-' + cls).join(" ")
@@ -151,7 +174,7 @@ const askInTabExt = (() => {
   
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
-    newResponseCnt.children[0].innerHTML = renderMarkdown(req.raw) 
+    newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.response}`) 
 
     for(let fu of [...req.followUps, "I want to ask something else"]){
       let btn = document.createElement("button")
@@ -164,11 +187,11 @@ const askInTabExt = (() => {
         let parentId = newResponseCnt.parentElement.id.split('-').pop()
         let clone = mdCnt.cloneNode(false)
         newResponseCnt.lastChild.before(clone)
-        clone.classList.add(getClassName("loading"))
         positionPopover(evt.target, popover)
         openPopover("FOLLOWUP", Number(parentId))
         if(evt.target.textContent.toUpperCase() !== "I want to ask something else".toUpperCase()){
           textarea.value = evt.target.textContent 
+
         }
         return
       }
@@ -224,7 +247,7 @@ const askInTabExt = (() => {
         let resCnt = document.querySelector("#" + getClassName("request-" + r.parentId)+" ."+getClassName("response-cnt")) 
         console.log(resCnt)
         let newMdCnt = mdCnt.cloneNode(false) 
-        newMdCnt.innerHTML = renderMarkdown(r.response)
+        newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.response}`)
         resCnt.lastChild.before(newMdCnt)
         fuCnt = newMdCnt.nextElementSibling
         for (let i = 0; i < r.followUps.length; i++){
@@ -326,15 +349,24 @@ const askInTabExt = (() => {
       let llm = formData.get("llm");
       let parentReqId = formData.get("parentReqId");
       let highlight = document.querySelector(`#${getClassName('request-pending')}`);
-      console.log(formData)
       form.querySelectorAll("input, textarea").forEach(input => input.value = "");
       popover.classList.remove(getClassName('open'))
       this.reset()
       let ret; 
       let payload=null
-      if(type === "STANDALONE") payload = {question, llm, type} 
+      if(type === "STANDALONE"){
+        setSpinner() 
+        payload = {question, llm, type} 
+      } 
       if(type === "INIT_CONVERSATION") payload = {question, selectedText: highlight.textContent, llm, savedRange, type}
-      if(type === "FOLLOWUP") payload = {question, llm, type, parentReqId}
+      if(type === "FOLLOWUP"){
+        let rCnt = document.querySelector(`#${getClassName('request')}-${parentReqId}`).lastChild 
+        let fuCnt = rCnt.lastChild
+        fuCnt.classList.add(getClassName("hidden"))
+        fuCnt.previousElementSibling.innerHTML = spinner
+        fuCnt.previousElementSibling.classList.add(getClassName("loading"))
+        payload = {question, llm, type, parentReqId}
+      }
 
       ret = await chrome.runtime.sendMessage({ type: "LLM_REQUEST", payload })
       if (type === "INIT_CONVERSATION" && highlight.textContent.length > 0){
@@ -352,23 +384,17 @@ const askInTabExt = (() => {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
-        if(msg.payload.type === "STANDALONE" && focusedElement){
-          console.log("HEREEEEE")
-          let pasteEvent = new ClipboardEvent("paste", {
-            bubbles: true,
-            cancelable: true,
-            clipboardData: new DataTransfer()
-          });
-          console.log(document.activeElement)
-          console.log(focusedElement)
-          pasteEvent.clipboardData.setData("text/plain", msg.payload.raw); 
+        const {type, id, parentId, question, response, followUps } = msg.payload
+        if(type === "STANDALONE" && focusedElement){
+          document.querySelector("#"+getClassName("waiting")).remove()
+          let pasteEvt = setPasteEvent(response) 
           focusedElement.focus()
-          document.activeElement.dispatchEvent(pasteEvent)
+          document.activeElement.dispatchEvent(pasteEvt)
           return
         }
 
-        if(msg.payload.type === "INIT_CONVERSATION" ){
-          let req = document.querySelector("#" + getClassName("request-" + msg.payload.id)) 
+        if(type === "INIT_CONVERSATION" ){
+          let req = document.querySelector("#" + getClassName("request-" + id)) 
           let pendingLink = req.querySelector("a")
           let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
           pendingLink.innerHTML=`[${links.length}]`
@@ -377,14 +403,15 @@ const askInTabExt = (() => {
           return
         } 
 
-        if(msg.payload.type === "FOLLOWUP" ){
-          let req = document.querySelector("#" + getClassName("request-" + msg.payload.parentId)) 
+        if(type === "FOLLOWUP" ){
+          let req = document.querySelector("#" + getClassName("request-" + parentId)) 
           let mdCnt = req.querySelector("."+getClassName("loading"))
           mdCnt.classList.remove(getClassName('loading'));
-          mdCnt.innerHTML = renderMarkdown(msg.payload.raw)
+          mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${response}`))
           fuCnt = mdCnt.nextElementSibling
-          for (let i = 0; i < msg.payload.followUps.length; i++){
-            fuCnt.children[i].innerText = msg.payload.followUps[i]
+          fuCnt.classList.remove(getClassName("hidden"))
+          for (let i = 0; i < followUps.length; i++){
+            fuCnt.children[i].innerText = followUps[i]
           }
           return
         }
