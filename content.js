@@ -429,10 +429,12 @@ const askInTabExt = (() => {
     window.addEventListener('load', async () => {
       let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
       if(res.requests.length > 0) loadResponse(res.requests)
-      let mdCnt = document.querySelector(window.location.hash)
-      if(!mdCnt)return
-      mdCnt.parentElement.classList.remove(getClassName("hidden"))
-      mdCnt.scrollIntoView({behavior: 'smooth'})
+      if(window.location.hash){
+        let mdCnt = document.querySelector(window.location.hash)
+        if(!mdCnt)return
+        mdCnt.parentElement.classList.remove(getClassName("hidden"))
+        mdCnt.scrollIntoView({behavior: 'smooth'})
+      }
     });
     
     popoverCloseBtn.addEventListener('click', (e) => {

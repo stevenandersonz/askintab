@@ -37,9 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if(Object.keys(urls).length > 0){
     document.querySelector("#no-data").remove()
     document.querySelector("#main-panel").classList.remove("hidden")
-    console.log("----")
-    console.log(Object.keys(urls), cleanUrl(activeTab[0].url))
-    console.log("----")
     let urlSorted = prioritizeActiveUrl(Object.keys(urls), cleanUrl(activeTab[0].url))
     for(let url of urlSorted){
       let o = document.createElement("option")
@@ -79,19 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
 
   document.getElementById("export-btn").addEventListener("click", () => {
-    chrome.runtime.sendMessage({type:"DOWNLOAD"}, (res) => {
-      const blob = new Blob([res], { type: "text/plain" });
-
-      // Create a temporary download link
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "exported_file.txt"; // File name
-
-      // Simulate click to trigger download
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a); // Clean up
-    })
+    chrome.tabs.create({ url: `mdviewer.html?view=${urls[conversations.value].filter((r) => r.type==="INIT_CONVERSATION")[0].id}` }) 
   }) 
 
   // Settings panel toggle

@@ -2,6 +2,7 @@ import {grok, chatGPT} from"./llms/index.js"
 
 const DEBUG = false
 const TIMEOUT_AFTER = 1000*60*10
+
 function cleanUrl(url) {
   try {
       const urlObj = new URL(url);
@@ -13,6 +14,7 @@ function cleanUrl(url) {
       return url; // Return original if parsing fails
   }
 }
+
 class Request {
   static state = {
     data: [],
@@ -142,7 +144,6 @@ class LLM {
 
 }
 
-
 const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
@@ -161,9 +162,6 @@ for(let llm of llms){
   });
 }
 
-
-console.log(llmsMap)
-
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
@@ -171,9 +169,6 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    console.log("---")
-    console.log(sender)
-    console.log("----")
     const req = new Request(llm, question, selectedText, sender, savedRange, requestType, parentReqId);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
@@ -196,21 +191,6 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     llm.processQueue()
   }
 
-  if(type === "DOWNLOAD") {
-    let conversation = [] 
-    let initRequest = Request.getAllRequests().filter(req => req.type === "INIT_CONVERSATION")
-    for (let req of initRequest){
-      conversation.push(`--- \n origin: ${req.sender.url} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n ${req.raw}`)
-      for (let cId of req.conversation){
-        let ret = Request.findById(cId)
-        conversation.push(`### ${ret.question} \n ${ret.response}`)
-      }
-    }
-    console.log(conversation.join("\n"))
-    sendResponse(conversation.join("\n"))
-    
-  }
-
   if(type === "LLM_INFO") {
     sendResponse(llms.filter(llm => llm.tabId).sort((a,b) => b.lastUsed - a.lastUsed))
   }
@@ -220,6 +200,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     let requests = Request.getAllRequests().filter(req => req.sender.url === cleanUrl(sender.url))
     sendResponse({requests})
   }
+
   if (type === 'PAGE_STATS') {
     const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
     const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
@@ -229,6 +210,28 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
 
   if (type === 'GET_ALL') {
     sendResponse(Request.getAllRequests())
+  }
+
+  if (type === 'EXPORT_CONVERSATION') {
+    let conversation = []
+    console.log(payload.id)
+    let req = Request.findById(Number(payload.id))
+    console.log(req)
+    conversation.push(`---
+        \n origin: ${req.sender.url}
+        \n llm: ${req.llm}
+        \n url: ${req.conversationURL}
+        \n highlighted: ${req.selectedText}
+        \n ---
+        \n ### ${req.question} 
+        \n ${req.response}`)
+
+    for (let cId of req.conversation){
+      let ret = Request.findById(cId)
+      conversation.push(`### ${ret.question} \n ${ret.response}`)
+    }
+    console.log(conversation)
+    sendResponse(conversation.join("\n"))
   }
 
 });

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Viewer</title>
+    <link rel="icon" href="askintab.png" type="image/png">
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            font-family: 'Lucida Console', monospace;
+            font-size: 28px;
+            margin-bottom: 60px;
+        }
+        .content-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            width: 80%;
+            max-width: 600px;
+        }
+        .button-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px;
+            background-color: #404040;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+        button:hover {
+            background-color: #505050;
+        }
+        button svg {
+            width: 24px;
+            height: 24px;
+            fill: #ffffff;
+        }
+        #markdownDisplay {
+            width: 100%;
+            min-height: 100px;
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 1px solid #404040;
+            padding: 10px;
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: monospace;
+            border-radius: 8px;
+        }
+        .title {
+            font-size: 24px;
+            margin: 0;
+            font-family: 'Lucida Console', monospace;
+            text-align: center; 
+        }
+    </style>
+</head>
+<body>
+    <pre class="title">
+        ______
+Ask In  /  Tab  \
+------------------
+    </pre>
+    <div class="content-wrapper">
+        <div class="button-wrapper">
+            <button id="copy" title="Copy to Clipboard">
+                <svg viewBox="0 0 24 24">
+                    <path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+            <button id="download" title="Download">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+            </button>
+        </div>
+        <pre id="markdownDisplay"></pre>
+        
+    </div>
+
+    <script src="mdviewer.js"></script>
+</body>
+</html>
