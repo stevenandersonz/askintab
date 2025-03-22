@@ -1,48 +1,13 @@
 const askInTabExt = (() => {
+  //---
+  // GLOBALS
+  //---  
+  const EXT_NAME = "companion"
+  let savedRange = null
+  let focusedElement = null
+
   const styles = `
-    .companion-link {
-      z-index: 1000;
-      text-decoration: underline;
-      cursor: pointer;
-      color: blue;
-    }
-    .companion-response-cnt {
-      position: relative;
-      margin: 15px 0;
-    }
-    .companion-quote::before {
-      content: '';
-      position: absolute;
-      left: -20px;
-      top: 0;
-      bottom: 0;
-      width: 5px;
-      border-radius: 5px;
-    }
-    .companion-followup-btn {
-      width: 100%;
-      border: none;
-      padding: 10px;
-      cursor: pointer;
-      border-top: solid 1px #555;
-      background: transparent;
-    }
-    .companion-followup-btn:last-child {
-      border-bottom: solid 1px #555;
-    }
-    .companion-followups-cnt {
-      justify-content: center;
-      align-items: flex-start;
-      display: flex;
-      flex-direction: column;
-    }
-    .companion-dark { color: #ffffff; }
-    .companion-dark .companion-quote::before { background-color: rgba(255, 255, 255, 0.5); }
-    .companion-light .companion-quote::before { background-color: rgba(0, 0, 0, 0.5); }
-    .companion-dark .companion-followup-btn:hover { background-color: rgba(0, 0, 0, 0.1); }
-    .companion-light .companion-followup-btn:hover { background-color: rgba(168, 168, 168, 0.1); }
-    .companion-light { color: #010101; }
-    .companion-popover {
+    .popover {
       position: absolute;
       background-color: #2c2c2e;
       border-radius: 8px;
@@ -55,11 +20,8 @@ const askInTabExt = (() => {
       z-index: 1000;
       font-size: 14px;
     }
-    .companion-open {
-      opacity: 1;
-      visibility: visible;
-    }
-    .companion-popover::before {
+
+    .popover::before {
       content: '';
       position: absolute;
       width: 0;
@@ -69,14 +31,13 @@ const askInTabExt = (() => {
       top: -12px;
       left: calc(50% - 6px);
     }
-    .companion-popover-form {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      margin-block-end: 0px;
+
+    .open {
+      opacity: 1;
+      visibility: visible;
     }
 
-    .companion-popover-close {
+    .popover-close {
       border: none;
       background-color: transparent;
       height: 15px;
@@ -91,20 +52,13 @@ const askInTabExt = (() => {
       position:absolute;
     }
 
-    .companion-popover-close:hover {
+    .popover-close:hover {
       border: 1px solid #3f3f41;
       color: black;
       border-radius: 8px;
     }
 
-    .companion-cnt-ask {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      border-top: #3f3f41 solid 2px;
-      padding: 8px;
-    }
-    .companion-cnt-ask button {
+    .cnt-ask button {
       align-self: center;
       border: 1px solid #2c2c2e; /* Match the crew */
       color: #000000; /* Black icon/text */
@@ -121,7 +75,7 @@ const askInTabExt = (() => {
       padding: 0; /* No extra fluff */
     }
 
-    .companion-cnt-ask button { background-color: #c3c2c2; }
+    .cnt-ask button:hover { background-color: #c3c2c2; }
 
     textarea {
       width:100%;
@@ -157,33 +111,14 @@ const askInTabExt = (() => {
       background-position: right 8px center; /* Arrow on the right */
       background-size: 12px; /*
     }
-
-    .companion-md-content {
-      background-color: transparent;
-      padding: 0;
-      margin: 0;
-    }
-
-    .companion-md-content h1, h2, h3 {
-      font-weight: 600;
-      font-size: 1rem;
-      line-height: calc(0.25rem * 7);
-    }
-
-    .companion-hidden { display: none; }
 `
-  //---
-  // GLOBALS
-  //---  
-  const EXT_NAME = "companion"
-  let savedRange = null
-  let focusedElement = null
+  
   //---
   // UI
   //--- 
 
   const highlight = document.createElement("span");
-  highlight.className = getClassName(["selection", getColorMode()]);
+  highlight.className = getClassName("selection");
 
   const spinner = `<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
   <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
@@ -192,16 +127,16 @@ const askInTabExt = (() => {
   </circle>
   </svg>`
 
-  const requestLink = document.createElement("a");
-  requestLink.href=`#`
-  requestLink.className = `${getClassName(['link'])}`;
-  requestLink.innerHTML = `[${spinner}]`;
+  const rLink = document.createElement("a");
+  rLink.href=`#`
+  rLink.setAttribute('style',"z-index: 1000; text-decoration: underline; cursor: pointer; color: blue;")
+  rLink.innerHTML = `[${spinner}]`;
 
   const shadowContainer = document.createElement('div');
   shadowContainer.id = 'popover-shadow-container';
 
   const popover = document.createElement('div');
-  popover.classList = getClassName('popover')
+  popover.classList = 'popover'
 
   const shadowRoot = shadowContainer.attachShadow({ mode: 'open' });
 
@@ -209,14 +144,14 @@ const askInTabExt = (() => {
   style.textContent = styles
 
   popover.innerHTML = `
-    <form class="${getClassName('popover-form')}">
+    <form style="display: flex; flex-direction: column; gap: 5px; margin-block-end: 0px;">
       <div style="position: relative; width:100%;">
-      <button type="button" class="${getClassName('popover-close')}">
+      <button type="button" class="popover-close">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
       </button>
       <textarea name="question" placeholder="ask anything"></textarea>
       </div>
-      <div class="${getClassName('cnt-ask')}">
+      <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: #3f3f41 solid 2px; padding: 8px;" class='cnt-ask'>
         <select name="llm"></select>
         <button type="submit">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-2xl"><path fill-rule="evenodd" clip-rule="evenodd" d="M15.1918 8.90615C15.6381 8.45983 16.3618 8.45983 16.8081 8.90615L21.9509 14.049C22.3972 14.4953 22.3972 15.2189 21.9509 15.6652C21.5046 16.1116 20.781 16.1116 20.3347 15.6652L17.1428 12.4734V22.2857C17.1428 22.9169 16.6311 23.4286 15.9999 23.4286C15.3688 23.4286 14.8571 22.9169 14.8571 22.2857V12.4734L11.6652 15.6652C11.2189 16.1116 10.4953 16.1116 10.049 15.6652C9.60265 15.2189 9.60265 14.4953 10.049 14.049L15.1918 8.90615Z" fill="currentColor"></path></svg> 
@@ -231,7 +166,7 @@ const askInTabExt = (() => {
   shadowRoot.appendChild(popover);
 
   const form = popover.querySelector("form")
-  const popoverCloseBtn = popover.querySelector("."+getClassName("popover-close"))
+  const popoverCloseBtn = popover.querySelector(".popover-close")
   const textarea = popover.querySelector("textarea")
   const llmSelect = popover.querySelector("select")
   const reqTypeInput = popover.querySelector("input[name='reqType']")
@@ -240,12 +175,14 @@ const askInTabExt = (() => {
   //response UI
   const mdCnt = document.createElement("div");
   mdCnt.classList.add(getClassName("md-content"))
+  mdCnt.setAttribute('style',"background-color: transparent; padding: 0; margin: 0;")
+
 
   const followUpsCnt = document.createElement("div"); 
   followUpsCnt.classList.add(getClassName("followups-cnt"))
 
   const responseCnt = document.createElement("div");
-  responseCnt.className = getClassName(['response-cnt', "hidden",  "quote"])
+  responseCnt.className = getClassName(['response-cnt', "hidden", getColorMode()])
   responseCnt.appendChild(mdCnt)
   responseCnt.appendChild(followUpsCnt)
 
@@ -353,7 +290,7 @@ const askInTabExt = (() => {
   }
 
   function createLink(){
-    let link = requestLink.cloneNode(true)
+    let link = rLink.cloneNode(true)
     link.addEventListener("click", function(e){
       e.preventDefault(); // Prevent default link behavior
       let responseCnt = this.nextElementSibling
@@ -412,7 +349,7 @@ const askInTabExt = (() => {
   }
 
   async function openPopover(reqType, parentReqId=null){
-    popover.classList.add(getClassName("open"))
+    popover.classList.add("open")
     textarea.focus()
 
     let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
@@ -447,7 +384,7 @@ const askInTabExt = (() => {
         highlight.appendChild(link);
         highlight.classList.remove(getClassName("selection"))
         highlight.appendChild(link)
-        link.innerHTML = `[${document.querySelectorAll("."+getClassName("link")).length}]`
+        link.innerHTML = `[${document.querySelectorAll("."+ rLink.className).length}]`
         let newResponseCnt = createResponseCnt(r)
         highlight.appendChild(newResponseCnt)
       }
@@ -466,8 +403,6 @@ const askInTabExt = (() => {
     
   }
 
-
-
   // Initialization
   function init(){
     mermaid.initialize({ startOnLoad: true });
@@ -483,8 +418,7 @@ const askInTabExt = (() => {
     });
     
     popoverCloseBtn.addEventListener('click', (e) => {
-      console.log("here")
-      popover.classList.remove(getClassName("open"))
+      popover.classList.remove('open')
       let sel = document.querySelector("."+getClassName("selection"))
       if (sel) sel.classList.remove(getClassName("selection"))
     });
@@ -542,7 +476,7 @@ const askInTabExt = (() => {
       let parentReqId = formData.get("parentReqId");
       let highlight = document.querySelector(`#${getClassName('request-pending')}`);
       form.querySelectorAll("input, textarea").forEach(input => input.value = "");
-      popover.classList.remove(getClassName('open'))
+      popover.classList.remove('open')
       this.reset()
       let ret; 
       let payload=null
@@ -569,7 +503,6 @@ const askInTabExt = (() => {
       }
 
     });
-
   }
 
   function setupChromeRuntimeListeners(){
@@ -587,9 +520,8 @@ const askInTabExt = (() => {
 
         if(type === "INIT_CONVERSATION" ){
           let req = document.querySelector("#" + getClassName("request-" + id)) 
-          let pendingLink = req.querySelector("a")
-          let links = document.querySelectorAll(`[class^=${getClassName('link')}]`)
-          pendingLink.innerHTML=`[${links.length}]`
+          let pendingLink = req.querySelector('a')
+          pendingLink.innerHTML = `[${document.querySelectorAll(`[id^='${getClassName("request-")}']`).length}]`
           let newResponseCnt = createResponseCnt(msg.payload)
           pendingLink.parentElement.appendChild(newResponseCnt)
           return
