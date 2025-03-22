@@ -23,7 +23,8 @@
 [x] suport "ask myself box" + if response is open default prompter to there 
 [x] request over the same response should be linked 
 [x] write tweet + email using askintab prompter
-[] add loading spinners for followups and standalone questions
+[x] add loading spinners for followups and standalone questions
+[] make popup good enough 
 
 [] add error handling 
 [] retry link support for when request timeout 

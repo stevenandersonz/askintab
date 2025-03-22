@@ -129,6 +129,7 @@ const askInTabExt = (() => {
 
   const rLink = document.createElement("a");
   rLink.href=`#`
+  rLink.className=getClassName("link")
   rLink.setAttribute('style',"z-index: 1000; text-decoration: underline; cursor: pointer; color: blue;")
   rLink.innerHTML = `[${spinner}]`;
 
@@ -501,7 +502,6 @@ const askInTabExt = (() => {
         highlight.appendChild(link);
         highlight.classList.remove(getClassName("selection"))
       }
-
     });
   }
 
@@ -520,7 +520,7 @@ const askInTabExt = (() => {
 
         if(type === "INIT_CONVERSATION" ){
           let req = document.querySelector("#" + getClassName("request-" + id)) 
-          let pendingLink = req.querySelector('a')
+          let pendingLink = req.querySelector('.'+rLink.className)
           pendingLink.innerHTML = `[${document.querySelectorAll(`[id^='${getClassName("request-")}']`).length}]`
           let newResponseCnt = createResponseCnt(msg.payload)
           pendingLink.parentElement.appendChild(newResponseCnt)
