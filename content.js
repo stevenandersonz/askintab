@@ -1,4 +1,5 @@
 const askInTabExt = (() => {
+  console.log("RELOAD")
   //---
   // GLOBALS
   //---  
@@ -191,6 +192,9 @@ const askInTabExt = (() => {
   //---
   //UTILS
   //---
+  // content.js
+ 
+
   function setPasteEvent(text){
     let pasteEvent = new ClipboardEvent("paste", {
       bubbles: true,
@@ -307,6 +311,7 @@ const askInTabExt = (() => {
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
     newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.response}`) 
+    newResponseCnt.children[0].id = getClassName("md-"+req.id)
 
     for(let fu of [...req.followUps, "I want to ask something else"]){
       let btn = document.createElement("button")
@@ -394,6 +399,7 @@ const askInTabExt = (() => {
         console.log(resCnt)
         let newMdCnt = mdCnt.cloneNode(false) 
         newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.response}`)
+        newMdCnt.id = r.id 
         resCnt.lastChild.before(newMdCnt)
         fuCnt = newMdCnt.nextElementSibling
         for (let i = 0; i < r.followUps.length; i++){
@@ -413,9 +419,20 @@ const askInTabExt = (() => {
   };
 
   function setupEventListeners(){
+
+    window.addEventListener('hashchange', () => {
+      let mdCnt = document.querySelector(window.location.hash)
+      mdCnt.parentElement.classList.remove(getClassName("hidden"))
+      mdCnt.scrollIntoView({behavior: 'smooth'})
+    })
+
     window.addEventListener('load', async () => {
       let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
       if(res.requests.length > 0) loadResponse(res.requests)
+      let mdCnt = document.querySelector(window.location.hash)
+      if(!mdCnt)return
+      mdCnt.parentElement.classList.remove(getClassName("hidden"))
+      mdCnt.scrollIntoView({behavior: 'smooth'})
     });
     
     popoverCloseBtn.addEventListener('click', (e) => {
@@ -531,6 +548,7 @@ const askInTabExt = (() => {
           let req = document.querySelector("#" + getClassName("request-" + parentId)) 
           let mdCnt = req.querySelector("."+getClassName("loading"))
           mdCnt.classList.remove(getClassName('loading'));
+          mdCnt.id=getClassName("md-"+id)
           mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${response}`))
           fuCnt = mdCnt.nextElementSibling
           fuCnt.classList.remove(getClassName("hidden"))
@@ -540,7 +558,8 @@ const askInTabExt = (() => {
           return
         }
       }
-    
+      // Send data to popup when requested
+
       if (msg.type === "LLM_TIMEOUT") {
         const { id } = msg.payload
         let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));

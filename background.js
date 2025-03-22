@@ -2,14 +2,24 @@ import {grok, chatGPT} from"./llms/index.js"
 
 const DEBUG = false
 const TIMEOUT_AFTER = 1000*60*10
-
+function cleanUrl(url) {
+  try {
+      const urlObj = new URL(url);
+      // Return only protocol, hostname, and pathname
+      return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
+  } catch (e) {
+      // Fallback for invalid URLs
+      console.error('Invalid URL:', url, e);
+      return url; // Return original if parsing fails
+  }
+}
 class Request {
   static state = {
     data: [],
     requestsCreated: 0,
   };
 
-  constructor(llm, question, selectedText, senderId, senderURL, savedRange, type, parentId=null) {
+  constructor(llm, question, selectedText, sender, savedRange, type, parentId=null) {
     this.id = Request.state.requestsCreated;
     this.selectedText = selectedText;
     this.createdAt = Date.now();
@@ -21,9 +31,12 @@ class Request {
     this.llm = llm;
     this.status = "pending"
     this.timeoutId = null
-    this.senderId = senderId
+    this.sender = {
+      id: sender.tab.id,
+      title: sender.tab.title,
+      url: cleanUrl(sender.url)
+    }
     this.type = type
-    this.senderURL = senderURL
     this.savedRange = savedRange 
     this.conversation = []
     this.response = null
@@ -87,7 +100,7 @@ class LLM {
     if (this.mockResponse) {
       setTimeout(() => {
         this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
-        chrome.tabs.sendMessage(this.currentRequest.senderId, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
+        chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
         this.processing = false
         this.currentRequest = null
         this.processQueue()
@@ -117,7 +130,6 @@ class LLM {
       if (this.processing && this.currentRequest === req) {
         console.log(`REQUEST TIMEOUT ${this.name}`);
         req.status="failed"
-        chrome.tabs.sendMessage(req.senderId, { type: "LLM_TIMEOUT", id: req.createdAt });
         this.processing = false;
         this.currentRequest = null;
         this.processQueue();
@@ -159,7 +171,10 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
     //todo: this should be independent from annotation
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender.tab.id, sender.url, savedRange, requestType, parentReqId);
+    console.log("---")
+    console.log(sender)
+    console.log("----")
+    const req = new Request(llm, question, selectedText, sender, savedRange, requestType, parentReqId);
     llmsMap[llm].queue.push(req)
     llmsMap[llm].processQueue() 
     sendResponse({ id: req.id, status: req.status})
@@ -172,8 +187,8 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     console.log(payload)
 
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
+    console.log(Request.getAllRequests())
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-    chrome.tabs.sendMessage(llm.currentRequest.senderId, { type: "LLM_RESPONSE", payload: llm.currentRequest }); 
 
     // free llm to process new item in the queue
     llm.processing = false
@@ -185,7 +200,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     let conversation = [] 
     let initRequest = Request.getAllRequests().filter(req => req.type === "INIT_CONVERSATION")
     for (let req of initRequest){
-      conversation.push(`--- \n origin: ${req.senderURL} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n ${req.raw}`)
+      conversation.push(`--- \n origin: ${req.sender.url} \n llm: ${req.llm} \n url: ${req.conversationURL} \n Selected Text: ${req.selectedText}\n --- \n ${req.raw}`)
       for (let cId of req.conversation){
         let ret = Request.findById(cId)
         conversation.push(`### ${ret.question} \n ${ret.response}`)
@@ -202,8 +217,18 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
 
   if(type === "LOAD_PAGE") {
     console.log(sender)
-    let requests = Request.getAllRequests().filter(req => req.senderURL === sender.url)
+    let requests = Request.getAllRequests().filter(req => req.sender.url === cleanUrl(sender.url))
     sendResponse({requests})
+  }
+  if (type === 'PAGE_STATS') {
+    const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
+    const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
+    const questionCount = questions.length
+    sendResponse({ questionCount, questions })
+  }
+
+  if (type === 'GET_ALL') {
+    sendResponse(Request.getAllRequests())
   }
 
 });

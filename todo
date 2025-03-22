@@ -25,9 +25,11 @@
 [x] write tweet + email using askintab prompter
 [x] add loading spinners for followups and standalone questions
 [] make popup good enough 
-
-[] add error handling 
-[] retry link support for when request timeout 
+[x] refactor sneder in Requests
+[x] fix len url title in popover 
+[x] sort the default title by current page 
+[x] how do we make sure the url is saved without any hash
+[x] question lookup
 
 [] add alert for prompt too large
 [] what can we do if prompt too large 
