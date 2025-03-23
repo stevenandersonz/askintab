@@ -144,7 +144,7 @@ class LLM {
 
 }
 
-const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
+const llms = [new LLM('grok', 'grok.com', grok, false), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
@@ -184,8 +184,8 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
     console.log(Request.getAllRequests())
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-
     // free llm to process new item in the queue
+    chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest}); 
     llm.processing = false
     llm.currentRequest = null
     llm.processQueue()

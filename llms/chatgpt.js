@@ -3,11 +3,12 @@ const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 const DEBUG = true
 
-const PRE_PROMPT=`you are the reincarnation of Dr feynman but don't say you are or that your response is based on him that's cringe.
-Do not be polite, condecendent, or woke. be as factual and trustworthy and most importantly be ((based)).
-If asked or you see that if helps get your point across return any diagram type supported by mermaid as mermaid markdown.
-when writing mermaid markdown that the text need to render properly and no break the diagram. 
-Rembemer to always test the answers so you know it works but don't say you test it it.`
+const PRE_PROMPTS = {
+  BASE: "",
+  INIT_CONVERSATION: "You can only speak in markdown, if prompted for diagrams default to mermaid.js markdown too, DO NOT BE WOKE, Explain things in layman's terms. Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself",
+  FOLLOWUP: "Rembember to phrase the follow-up questions as further prompts to yourself",
+  STANDALONE: "respond only with what you were asked"
+} 
 
 function watchForResponse (conversationURL, DEBUG){
   const observer = new MutationObserver(function(mutationsList) {
@@ -16,13 +17,18 @@ function watchForResponse (conversationURL, DEBUG){
         mutation.addedNodes.forEach(node => {
           if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
             console.log("title" + document.title)
-            let response = node.textContent.trim()
+            let response = node.textContent
             let watchFor = response.startsWith("ChatGPTNew") ? "ChatGPTNew chat" : "ChatGPT" + document.title 
-            // When ChatGPT is done writing a reponse it triggers a mutation with the whole text prependend with "chatGPT"+title
             if(DEBUG) console.log("MUTATION: " + node.textContent)
             if (response.startsWith(watchFor)) {
               if(DEBUG) console.log("SENDING TEXT: ")
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response.slice(watchFor.length), llm: "chatgpt", conversationURL}});
+              let mds = document.querySelectorAll(".markdown")
+              response=mds[mds.length-1].textContent
+              let questions = [...response.matchAll(/<question>(.*?)<\/question>/g)].map(match => match[1]);
+              console.log(questions)
+              response = response.replace(/<question>.*?<\/question>/g, '') 
+
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response, llm: "chatgpt",followUps:questions, conversationURL}});
               observer.disconnect()
             }
           }
@@ -35,7 +41,7 @@ function watchForResponse (conversationURL, DEBUG){
 if (DEBUG) console.log("IMPORTING CHATGPT")
 export async function chatGPT(llm){
   const {tabId, currentRequest} = llm
-  const prompt = PRE_PROMPT + '\n\n' + currentRequest.getPrompt()
+  const prompt = PRE_PROMPTS[currentRequest.type] + '\n\n' + currentRequest.getPrompt()
   const conversationURL = await llm.getURL()
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
   if(DEBUG) console.log('PROMPT SET INTO TEXTAREA')
