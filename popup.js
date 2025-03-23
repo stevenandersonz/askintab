@@ -10,6 +10,7 @@ function cleanUrl(url) {
       return url; // Return original if parsing fails
   }
 }
+
 function foldText(text){
   return text.substring(0, 20) + (text.length > 25 ? '...' : '');
 }
@@ -23,6 +24,17 @@ function prioritizeActiveUrl(urls, activeUrl) {
   return urls;
 }
 document.addEventListener('DOMContentLoaded', async () => {
+  let ts = await chrome.storage.local.get(["tokenTimestamp"])
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  console.log(ts)
+  console.log((Date.now() - ts.tokenTimestamp))
+
+  if(ts && (Date.now() - ts.tokenTimestamp) < 1000*60*5){
+    loginBtn.parentElement.classList.add("hidden")
+    logoutBtn.parentElement.classList.remove("hidden")
+  }
+
   let conversations = document.querySelector("#conversations")
   let rs = await chrome.runtime.sendMessage({ type: 'GET_ALL'})
   let activeTab = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -45,8 +57,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       conversations.appendChild(o)
     }
   }
-
-  conversations.value = conversations.children[0].value
 
   conversations.addEventListener("change", async function(evt){
     const questions = urls[evt.target.value].map(r => ({text: r.question, id: "companion-md-" + r.id }));
@@ -71,8 +81,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
   })
-  conversations.value = conversations.children[0].value
-  conversations.dispatchEvent(new Event('change', { bubbles: true }))
+
+  if(conversations.children.length>0){
+    conversations.value = conversations.children[0].value
+    conversations.dispatchEvent(new Event('change', { bubbles: true }))
+  }
   
 
   document.getElementById("export-btn").addEventListener("click", () => {
@@ -115,6 +128,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           shortcutInput.value = data.shortcut;
       }
   });
+
+  loginBtn.addEventListener("click", async function(){
+    chrome.runtime.sendMessage({ type: "LOGIN" }, (response) => {
+      if (response.status === "initiated") {
+        console.log(response)
+        //document.getElementById("user-info").innerText = "Logging in...";
+      }
+    });
+  }) 
+
+  logoutBtn.addEventListener("click", async function(){
+    await chrome.storage.local.remove("tokenTimestamp,accessToken,refreshToken".split(",")) 
+    console.log("logout")
+    return
+  }) 
+
 }); 
   
 

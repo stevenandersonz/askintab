@@ -2,6 +2,7 @@ import {grok, chatGPT} from"./llms/index.js"
 
 const DEBUG = false
 const TIMEOUT_AFTER = 1000*60*10
+let token = null;
 
 function cleanUrl(url) {
   try {
@@ -12,6 +13,18 @@ function cleanUrl(url) {
       // Fallback for invalid URLs
       console.error('Invalid URL:', url, e);
       return url; // Return original if parsing fails
+  }
+}
+
+function decodeJWT(token) {
+  try {
+    const base64Url = token.split(".")[1]; // Get payload part
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/"); // Convert base64url to base64
+    const jsonPayload = atob(base64); // Decode base64 to string
+    return JSON.parse(jsonPayload); // Parse JSON
+  } catch (e) {
+    console.error("Error decoding JWT:", e);
+    return null;
   }
 }
 
@@ -56,7 +69,7 @@ class Request {
     return `${this.question} \n ${this.selectedText}`;
   }
 
-  saveResponse(response, conversationURL, followUps) {
+  async saveResponse(response, conversationURL, followUps) {
     this.responseAt = Date.now();
     this.conversationURL = conversationURL;
     this.status = "completed"
@@ -67,6 +80,7 @@ class Request {
   static getAllRequests() {
     return this.state.data;
   }
+
   static findById(id) {
     console.log(this.state.data)
     let ret = this.state.data.filter(r => r.id===id)
@@ -77,6 +91,20 @@ class Request {
   
   static getRequestCount() {
     return this.state.count;
+  }
+
+  async sync(){
+    let token = await chrome.storage.local.get("accessToken")
+    console.log(token)
+    if(token){
+      let res = await fetch("http://localhost:3000/sync", {
+        body: JSON.stringify(this),
+        method: "POST",
+        headers: {"Authorization": `Bearer ${token.accessToken}`}
+      })
+      let data = await res.json()
+      console.log(data)
+    }
   }
 
 }
@@ -100,8 +128,9 @@ class LLM {
       console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
     }
     if (this.mockResponse) {
-      setTimeout(() => {
+      setTimeout(async() => {
         this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
+        await this.currentRequest.sync() 
         chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
         this.processing = false
         this.currentRequest = null
@@ -113,6 +142,7 @@ class LLM {
     } 
 
   }
+  
 
   async getURL() {
     let tab = await chrome.tabs.get(this.tabId);
@@ -144,7 +174,7 @@ class LLM {
 
 }
 
-const llms = [new LLM('grok', 'grok.com', grok, false), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
+const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
 let llmsMap = llms.reduce((llms, llm) => {
     llms[llm.name] = llm
     return llms
@@ -182,7 +212,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     console.log(payload)
 
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
-    console.log(Request.getAllRequests())
+    await llm.currentRequest.sync() 
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
     // free llm to process new item in the queue
     chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest}); 
@@ -234,4 +264,66 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     sendResponse(conversation.join("\n"))
   }
 
+  if(type === "LOGIN"){
+    const authUrl = 'http://localhost:3000/auth/google';
+    sendResponse({ status: "initiated" })
+    let redirectUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true})
+    console.log(redirectUrl)
+    const accessToken = new URL(redirectUrl).searchParams.get("access_token");
+    const refreshToken = new URL(redirectUrl).searchParams.get("refresh_token");
+    console.log("SUCCESS")
+    console.log(accessToken)
+    console.log(refreshToken)
+    // store token
+    if (accessToken && refreshToken) {
+      // Store the tokens in chrome.storage.local
+      await chrome.storage.local.set({accessToken: accessToken, refreshToken: refreshToken, tokenTimestamp: Date.now()})
+      console.log("TOKENS SAVED")
+      let decodedAccessToken = decodeJWT(accessToken)
+      console.log(decodedAccessToken)
+      chrome.alarms.create("refreshToken", {
+        periodInMinutes: 2// Fires every 10 minutes
+      });
+
+    }
+  }
+
+  if (message.action === "ME") {
+    if (!token) {
+      sendResponse({ error: "Not authenticated" });
+      return true;
+    }
+    fetch("http://localhost:3000/api/user", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => sendResponse(data))
+      .catch(() => sendResponse({ error: "Failed to fetch user" }));
+    return true;
+  }
+
+});
+
+chrome.alarms.onAlarm.addListener(async(alarm) => {
+  if (alarm.name === "refreshToken") {
+    console.log("Alarm fired - Refreshing token...");
+    try {
+      let {refreshToken} = await chrome.storage.local.get(["refreshToken"])
+      console.log(refreshToken)
+      let res = await fetch("http://localhost:3000/refresh", {
+        headers: { Authorization: `Bearer ${refreshToken}` },
+        method: "POST"
+      })
+      if(res.ok){
+        let data =  await res.json()
+        console.log(data)
+        console.log("new tokens set")
+        return await chrome.storage.local.set({accessToken: data.accessToken, refreshToken: data.refreshToken, tokenTimestamp: Date.now()})
+      }
+      console.log(res)
+    return true;
+    } catch(e){
+      console.log(e)
+    }
+  }
 });
