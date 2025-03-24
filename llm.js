@@ -5,7 +5,7 @@ const DEBUG = true
 
 export default class LLM {
   static llms = []
-  constructor(name, domain, send, mockResponse=false) {
+  constructor(name, domain, send, mockResponse=false, returnFollowups=true) {
     this.name = name;
     this.domain = domain;
     this.lastUsed = null;
@@ -15,6 +15,7 @@ export default class LLM {
     this.debuggerAttached = false;
     this.processRequest = send;
     this.mockResponse = mockResponse;
+    this.returnFollowups = returnFollowups;
     LLM.llms.push(this)
   }
 
@@ -98,5 +99,5 @@ export default class LLM {
   }
 }
 
-new LLM('grok', 'grok.com', grok, true)
-new LLM('chatgpt', 'chatgpt.com', chatgpt, true)
+new LLM('grok', 'grok.com', grok, true, true)
+new LLM('chatgpt', 'chatgpt.com', chatgpt, false, false)

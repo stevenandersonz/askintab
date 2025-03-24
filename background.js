@@ -1,7 +1,7 @@
 import LLM from "./llm.js"
 import {decodeJWT, cleanUrl} from"./utils/helpers.js"
 
-const DEBUG = false
+const DEBUG = true
 const BASE_URL = "http://localhost:3000"
 
 class Request {
@@ -241,6 +241,10 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     }catch(e){
       console.log(e)
     }
+  }
+
+  if(type==="DEBUG" && DEBUG){
+    console.log(payload)
   }
 });
 
