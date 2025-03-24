@@ -1,5 +1,4 @@
 const askInTabExt = (() => {
-  console.log("RELOAD")
   //---
   // GLOBALS
   //---  
@@ -97,6 +96,7 @@ const askInTabExt = (() => {
     }
 
     select {
+      width: 80px;
       background-color: #2c2c2e; /* Keep your dark vibe */
       border: 1px solid #2c2c2e; /* Match textarea */
       border-radius: 4px; /* Consistent corners */

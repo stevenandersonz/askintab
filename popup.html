@@ -179,15 +179,19 @@
 		.hidden {
 				display: none;
 		}
-
+		.section-auth {
+			position:absolute;
+			bottom: 10px;
+			right: 10px;
+		}
 		.google-btn {
-			width: 250px;
+			width: 150px;
 			height: 40px;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			background-color: #ffffff; /* Google Blue */
-			color: rgb(0, 0, 0);
+			background-color: transparent; /* Google Blue */
+			color: white;
 			border: 1px gray;
 			border-radius: 4px;
 			padding: 10px 20px;
@@ -198,7 +202,7 @@
 		}
 
 		.google-btn:hover {
-			background-color: #357abd; /* Darker blue on hover */
+			border: solid 1px black; /* Darker blue on hover */
 		}
 
 		.google-logo {
@@ -223,45 +227,28 @@
 Ask In  /  Tab  \
 ------------------
 		</pre>
-		<div id="no-data"> 
-			<button class="settings-btn" id="settings-btn">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-					<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.09-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-				</svg>
-			</button>	
-				<p> 0 conversations available </p>
-		</div>
-		<div id="main-panel" class="hidden">
+		
+		<div id="main-panel">
 			<button class="settings-btn" id="settings-btn">
 				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 					<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.09-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
 				</svg>
 			</button>
-
-			<div class="conversation-section">
-					<select id="conversations">
-					</select>
-					<button id="export-btn">Export</button>
+			<div id="no-data"> 
+					<p> No questions asked yet </p>
 			</div>
-			
-			<div class="stats">
-					<div>Total Questions: <span id="question-count">0</span></div>
+			<div id="data" class="hidden">
+				<div class="conversation-section">
+						<select id="conversations">
+						</select>
+						<button id="export-btn">Export</button>
+				</div>
+				<div class="stats">
+						<div>Total Questions: <span id="question-count">0</span></div>
+				</div>
+				<ul class="questions-list" id="questions-list">
+				</ul>
 			</div>
-
-			<ul class="questions-list" id="questions-list">
-			</ul>
-		</div>
-
-		<div class="settings-panel" id="settings-panel">
-			<button class="close-btn" id="close-settings">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-					<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-				</svg>
-			</button>
-			<h2>Settings</h2>
-			<div class="section-settings">
-			<label for="shortcut">Open Prompter:</label>
-			<input type="text" id="shortcut" placeholder="Press key combination">
 			<div class="section-auth">
 				<div>
 					<button id="login-btn" class="google-btn">
@@ -272,7 +259,7 @@ Ask In  /  Tab  \
 							<path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.2654 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853" />
 						</svg>
 						<span>
-						log in with google 
+							Sign in
 						</span>
 					</button>
 				</div>
@@ -282,6 +269,19 @@ Ask In  /  Tab  \
 					</button>
 				</div>
 			</div>
+		</div>
+
+	<div class="settings-panel" id="settings-panel">
+		<button class="close-btn" id="close-settings">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+				<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+			</svg>
+		</button>
+		<h2>Settings</h2>
+		<div class="section-settings">
+			<h3>Shortcuts Keys</h3>
+			<label for="shortcut">Ask Question:</label>
+			<input type="text" id="shortcut" placeholder="Press key combination">
 		</div>
 	</div>
 	</div>

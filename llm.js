@@ -28,7 +28,7 @@ export default class LLM {
       setTimeout(async() => {
         this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
         try {
-          await this.currentRequest.sync() 
+          //await this.currentRequest.sync() 
         }catch(e){
           console.log(e)
         }
@@ -99,4 +99,4 @@ export default class LLM {
 }
 
 new LLM('grok', 'grok.com', grok, true)
-new LLM('chatgpt', 'chatgpt.com', chatgpt, false)
+new LLM('chatgpt', 'chatgpt.com', chatgpt, true)

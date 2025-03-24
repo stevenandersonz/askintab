@@ -1,4 +1,3 @@
-const EXT_NAME = "COMPANION"
 function cleanUrl(url) {
   try {
       const urlObj = new URL(url);
@@ -14,6 +13,7 @@ function cleanUrl(url) {
 function foldText(text){
   return text.substring(0, 20) + (text.length > 25 ? '...' : '');
 }
+
 function prioritizeActiveUrl(urls, activeUrl) {
   const index = urls.indexOf(activeUrl);
   if (index !== -1) {
@@ -23,6 +23,7 @@ function prioritizeActiveUrl(urls, activeUrl) {
   }
   return urls;
 }
+
 document.addEventListener('DOMContentLoaded', async () => {
   let ts = await chrome.storage.local.get(["tokenTimestamp"])
   const loginBtn = document.getElementById('login-btn');
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     logoutBtn.parentElement.classList.remove("hidden")
   }
 
+  let dataSection = document.querySelector("#data")
   let conversations = document.querySelector("#conversations")
   let rs = await chrome.runtime.sendMessage({ type: 'GET_ALL'})
   let activeTab = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -47,8 +49,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log(urls)
 
   if(Object.keys(urls).length > 0){
-    document.querySelector("#no-data").remove()
-    document.querySelector("#main-panel").classList.remove("hidden")
+    dataSection.classList.remove("hidden")
+    document.querySelector("#no-data").classList.add("hidden")
     let urlSorted = prioritizeActiveUrl(Object.keys(urls), cleanUrl(activeTab[0].url))
     for(let url of urlSorted){
       let o = document.createElement("option")

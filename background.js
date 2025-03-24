@@ -51,6 +51,7 @@ class Request {
     this.status = "completed"
     this.followUps = followUps
     this.response = response
+    await saveLocal()
   }
 
   static getAllRequests() {
@@ -82,10 +83,42 @@ class Request {
       console.log(data)
     }
   }
-
 }
 
-chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
+async function saveLocal() {
+  try{
+    await chrome.storage.local.set({ extensionData: JSON.stringify(Request.getAllRequests())})
+    console.log("saved Requests")
+  }catch(e){
+    console.log(e)
+  }
+}
+
+async function loadFromLocalStorage() {
+  try {
+    let {extensionData} = await chrome.storage.local.get("extensionData")
+    Request.state.data = JSON.parse(extensionData)
+    Request.state.requestsCreated = Request.state.data.length 
+    console.log("Requests Loaded")
+  } catch(e){
+    console.log(e)
+  }
+}
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'update') {
+    console.log('Extension updated from version', details.previousVersion, 'to', chrome.runtime.getManifest().version);
+    loadFromLocalStorage();
+  } else if (details.reason === 'install') {
+    console.log('Extension installed');
+  }
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  LLM.loadAvailable() 
+  loadFromLocalStorage()
+});
+
 chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
 
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
@@ -117,6 +150,7 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     clearTimeout(llm.currentRequest)
 
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
+
     //await llm.currentRequest.sync() 
 
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
@@ -177,27 +211,12 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
       chrome.alarms.create("refreshToken", {
         periodInMinutes: decodedAccessToken.expiresInMinutes
       });
-
     }
   }
-
-  if (message.action === "ME") {
-    if (!token) {
-      sendResponse({ error: "Not authenticated" });
-      return true;
-    }
-    fetch("http://localhost:3000/api/user", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => sendResponse(data))
-      .catch(() => sendResponse({ error: "Failed to fetch user" }));
-    return true;
-  }
-
 });
 
 chrome.alarms.onAlarm.addListener(async(alarm) => {
+  console.log(alarm)
   if (alarm.name === "refreshToken") {
     console.log("Alarm fired - Refreshing token...");
     try {
