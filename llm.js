@@ -99,5 +99,5 @@ export default class LLM {
   }
 }
 
-new LLM('grok', 'grok.com', grok, true, true)
+new LLM('grok', 'grok.com', grok, false, true)
 new LLM('chatgpt', 'chatgpt.com', chatgpt, false, false)
