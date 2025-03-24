@@ -1,12 +1,12 @@
 function cleanUrl(url) {
   try {
-      const urlObj = new URL(url);
-      // Return only protocol, hostname, and pathname
-      return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
+    const urlObj = new URL(url);
+    // Return only protocol, hostname, and pathname
+    return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
   } catch (e) {
-      // Fallback for invalid URLs
-      console.error('Invalid URL:', url, e);
-      return url; // Return original if parsing fails
+    // Fallback for invalid URLs
+    console.error('Invalid URL:', url, e);
+    return url; // Return original if parsing fails
   }
 }
 
@@ -29,9 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
   console.log(ts)
-  console.log((Date.now() - ts.tokenTimestamp))
 
-  if(ts && (Date.now() - ts.tokenTimestamp) < 1000*60*5){
+  if(Object.keys(ts).length > 0){
     loginBtn.parentElement.classList.add("hidden")
     logoutBtn.parentElement.classList.remove("hidden")
   }
@@ -46,7 +45,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     acc[r.sender.url].push(r)
     return acc
   }, {})
-  console.log(urls)
 
   if(Object.keys(urls).length > 0){
     dataSection.classList.remove("hidden")
@@ -126,24 +124,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load stored shortcut
   chrome.storage.sync.get("shortcut", (data) => {
-      if (data.shortcut) {
-          shortcutInput.value = data.shortcut;
-      }
+    if (data.shortcut) {
+      shortcutInput.value = data.shortcut;
+    }
   });
 
   loginBtn.addEventListener("click", async function(){
     chrome.runtime.sendMessage({ type: "LOGIN" }, (response) => {
       if (response.status === "initiated") {
         console.log(response)
-        //document.getElementById("user-info").innerText = "Logging in...";
       }
     });
   }) 
 
   logoutBtn.addEventListener("click", async function(){
-    await chrome.storage.local.remove("tokenTimestamp,accessToken,refreshToken".split(",")) 
-    console.log("logout")
-    return
+    chrome.runtime.sendMessage({ type: "LOGOUT" }, (response) => {
+      if (response.status === "initiated") {
+        loginBtn.parentElement.classList.remove("hidden")
+        logoutBtn.parentElement.classList.add("hidden")
+      }
+    });
   }) 
 
 }); 

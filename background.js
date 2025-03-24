@@ -1,8 +1,8 @@
-import LLM from"./llm.js"
+import LLM from "./llm.js"
 import {decodeJWT, cleanUrl} from"./utils/helpers.js"
 
 const DEBUG = false
-let token = null;
+const BASE_URL = "http://localhost:3000"
 
 class Request {
   static state = {
@@ -59,10 +59,7 @@ class Request {
   }
 
   static findById(id) {
-    console.log(this.state.data)
     let ret = this.state.data.filter(r => r.id===id)
-    console.log("here")
-    console.log(ret)
     return ret.length === 1 ? ret[0]: null;
   }
   
@@ -70,18 +67,30 @@ class Request {
     return this.state.count;
   }
 
-  async sync(){
-    let token = await chrome.storage.local.get("accessToken")
-    console.log(token)
-    if(token){
-      let res = await fetch("http://localhost:3000/sync", {
-        body: JSON.stringify(this),
-        method: "POST",
-        headers: {"Authorization": `Bearer ${token.accessToken}`}
-      })
-      let data = await res.json()
-      console.log(data)
+  static async sync(){
+    try {
+      let {accessToken, extensionData} = await chrome.storage.local.get(["accessToken", "extensionData"])
+      if(accessToken){
+        console.log("---")
+        console.log(extensionData)
+        console.log("---")
+        let res = await fetch(BASE_URL + "/sync", {
+          body: extensionData,
+          method: "POST",
+          headers: {"Authorization": `Bearer ${accessToken}`}
+        })
+        if(res.ok){
+          let data = await res.json()
+          console.log(data)
+          console.log("sycn done")
+        }
+        console.log(res)
+      }
+    } catch(e){
+      console.log(e)
+      console.log("sycn failed")
     }
+    
   }
 }
 
@@ -102,6 +111,7 @@ async function loadFromLocalStorage() {
     console.log("Requests Loaded")
   } catch(e){
     console.log(e)
+    return
   }
 }
 
@@ -200,17 +210,36 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
   }
 
   if(type === "LOGIN"){
-    const authUrl = 'http://localhost:3000/auth/google';
+    const authUrl = BASE_URL + '/auth/google';
     sendResponse({ status: "initiated" })
     let redirectUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true})
     const accessToken = new URL(redirectUrl).searchParams.get("access_token");
     const refreshToken = new URL(redirectUrl).searchParams.get("refresh_token");
     if (accessToken && refreshToken) {
-      await chrome.storage.local.set({accessToken: accessToken, refreshToken: refreshToken, tokenTimestamp: Date.now()})
+      let ret = await fetch(BASE_URL + "/requests", { method: "GET", headers: {Authorization: `Bearer ${accessToken}`} })
+      let reqs = await ret.json()
+      Request.state.data = reqs
+      await chrome.storage.local.set({accessToken: accessToken, refreshToken: refreshToken, tokenTimestamp: Date.now(), extensionData: reqs})
       let decodedAccessToken = decodeJWT(accessToken)
+      console.log("decocded", decodedAccessToken)
       chrome.alarms.create("refreshToken", {
-        periodInMinutes: decodedAccessToken.expiresInMinutes
+        periodInMinutes: decodedAccessToken.expireInMinutes
       });
+      chrome.alarms.create("syncAccount", {
+        periodInMinutes: 2
+      });
+    }
+  }
+
+  if(type === "LOGOUT"){
+    try {
+    const authUrl = BASE_URL + '/logout';
+    sendResponse({ status: "initiated" })
+    await chrome.storage.local.remove("accessToken,refreshToken,tokenTimestamp,extensionData".split(","))
+    chrome.alarms.clear("refreshToken")
+    chrome.alarms.clear("syncAccount")
+    }catch(e){
+      console.log(e)
     }
   }
 });
@@ -222,7 +251,7 @@ chrome.alarms.onAlarm.addListener(async(alarm) => {
     try {
       let {refreshToken} = await chrome.storage.local.get(["refreshToken"])
       console.log(refreshToken)
-      let res = await fetch("http://localhost:3000/refresh", {
+      let res = await fetch(BASE_URL + "/refresh", {
         headers: { Authorization: `Bearer ${refreshToken}` },
         method: "POST"
       })
@@ -233,9 +262,12 @@ chrome.alarms.onAlarm.addListener(async(alarm) => {
         return await chrome.storage.local.set({accessToken: data.accessToken, refreshToken: data.refreshToken, tokenTimestamp: Date.now()})
       }
       console.log(res)
-    return true;
+      return true;
     } catch(e){
       console.log(e)
     }
+  }
+  if (alarm.name === "syncAccount"){
+    Request.sync()
   }
 });
