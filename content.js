@@ -359,11 +359,12 @@ const askInTabExt = (() => {
     textarea.focus()
 
     let llms = await chrome.runtime.sendMessage({ type: "LLM_INFO" })
+    console.log(llms)
     llmSelect.innerHTML = ""
     for(let llm of llms){
       let option = document.createElement("option")
-      option.value = llm.name
-      option.innerHTML = llm.name
+      option.value = llm
+      option.innerHTML = llm
       llmSelect.appendChild(option)
     }
     reqTypeInput.value = reqType

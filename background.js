@@ -1,32 +1,8 @@
-import {grok, chatGPT} from"./llms/index.js"
+import LLM from"./llm.js"
+import {decodeJWT, cleanUrl} from"./utils/helpers.js"
 
 const DEBUG = false
-const TIMEOUT_AFTER = 1000*60*10
 let token = null;
-
-function cleanUrl(url) {
-  try {
-      const urlObj = new URL(url);
-      // Return only protocol, hostname, and pathname
-      return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
-  } catch (e) {
-      // Fallback for invalid URLs
-      console.error('Invalid URL:', url, e);
-      return url; // Return original if parsing fails
-  }
-}
-
-function decodeJWT(token) {
-  try {
-    const base64Url = token.split(".")[1]; // Get payload part
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/"); // Convert base64url to base64
-    const jsonPayload = atob(base64); // Decode base64 to string
-    return JSON.parse(jsonPayload); // Parse JSON
-  } catch (e) {
-    console.error("Error decoding JWT:", e);
-    return null;
-  }
-}
 
 class Request {
   static state = {
@@ -109,124 +85,49 @@ class Request {
 
 }
 
-class LLM {
-  constructor(name, domain, send, mockResponse=false) {
-    this.name = name;
-    this.domain = domain;
-    this.lastUsed = null;
-    this.tabId = null;
-    this.queue = [];
-    this.processing = false;
-    this.currentRequest = null;
-    this.debuggerAttached = false;
-    this.processRequest = send;
-    this.mockResponse = mockResponse;
-  }
-
-  send() {
-    if (DEBUG) {
-      console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
-    }
-    if (this.mockResponse) {
-      setTimeout(async() => {
-        this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
-        await this.currentRequest.sync() 
-        chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
-        this.processing = false
-        this.currentRequest = null
-        this.processQueue()
-      }, 1000)
-      
-    } else {
-      this.processRequest(this);
-    } 
-
-  }
-  
-
-  async getURL() {
-    let tab = await chrome.tabs.get(this.tabId);
-    if (DEBUG) console.log(`${this.name.toUpperCase()} URL: ${tab.url}`);
-    return tab.url;
-  }
-
-
-  processQueue() {
-    if (this.processing || this.queue.length === 0) return;
-
-    const req = this.queue.shift();
-    this.processing = true;
-    this.lastUsed = Date.now();
-
-    req.timeoutId = setTimeout(() => {
-      if (this.processing && this.currentRequest === req) {
-        console.log(`REQUEST TIMEOUT ${this.name}`);
-        req.status="failed"
-        this.processing = false;
-        this.currentRequest = null;
-        this.processQueue();
-      }
-    }, TIMEOUT_AFTER);
-
-    this.currentRequest = req;
-    this.send();
-  }
-
-}
-
-const llms = [new LLM('grok', 'grok.com', grok, true), new LLM('chatgpt', 'chatgpt.com', chatGPT, false)]
-let llmsMap = llms.reduce((llms, llm) => {
-    llms[llm.name] = llm
-    return llms
-  }, {})
-
-// Check availables LLMS
-for(let llm of llms){
-  const urlPattern = `*://*.${llm.domain}/*`;
-  chrome.tabs.query({ url: urlPattern }, function(tabs) {
-    if(tabs.length <= 0) return
-    if(tabs.length > 1) console.log(`more than one tab for ${llm.domain} is present`) 
-    console.log(tabs)
-    console.log(`${llm.domain} is avaible at tab id: ${tabs[0].id}`)
-    llm.tabId = tabs[0].id 
-  });
-}
+chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
+chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
 
 chrome.runtime.onMessage.addListener(async function(message, sender, sendResponse) {
   const { type, payload } = message
+
+  if(type === "LLM_INFO") {
+    sendResponse(LLM.llms.filter(llm => llm.tabId).map(llm => llm.name))
+    return
+  }
+
   if (type === "LLM_REQUEST") {
-    const { question, selectedText, llm, savedRange, type:requestType, parentReqId} = payload
-    if (!llmsMap[llm].tabId) sendResponse({ error: `LLM ${llm} is not available` });
-    //todo: this should be independent from annotation
+    const { question, selectedText, llm:to, savedRange, type, parentReqId} = payload
+    if (!to) sendResponse({ error: `LLM is missing` }); 
+
+    let llm = LLM.get(to)
+    if (!llm) sendResponse({ error: `LLM ${to} is not available` });
+
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-    const req = new Request(llm, question, selectedText, sender, savedRange, requestType, parentReqId);
-    llmsMap[llm].queue.push(req)
-    llmsMap[llm].processQueue() 
+
+    const req = new Request(llm.name, question, selectedText, sender, savedRange, type, parentReqId);
+    llm.queue.push(req)
+    llm.processQueue() 
     sendResponse({ id: req.id, status: req.status})
   }
 
   if (type === "LLM_RESPONSE") {
-    console.log(`RESPONSE FROM ${payload.llm}`)
-    let llm = llmsMap[payload.llm] 
+    let llm = LLM.get(payload.llm)
+    if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
     clearTimeout(llm.currentRequest)
-    console.log(payload)
 
     llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
-    await llm.currentRequest.sync() 
+    //await llm.currentRequest.sync() 
+
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-    // free llm to process new item in the queue
     chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest}); 
+
     llm.processing = false
     llm.currentRequest = null
     llm.processQueue()
   }
 
-  if(type === "LLM_INFO") {
-    sendResponse(llms.filter(llm => llm.tabId).sort((a,b) => b.lastUsed - a.lastUsed))
-  }
-
   if(type === "LOAD_PAGE") {
-    console.log(sender)
     let requests = Request.getAllRequests().filter(req => req.sender.url === cleanUrl(sender.url))
     sendResponse({requests})
   }
@@ -268,21 +169,13 @@ chrome.runtime.onMessage.addListener(async function(message, sender, sendRespons
     const authUrl = 'http://localhost:3000/auth/google';
     sendResponse({ status: "initiated" })
     let redirectUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true})
-    console.log(redirectUrl)
     const accessToken = new URL(redirectUrl).searchParams.get("access_token");
     const refreshToken = new URL(redirectUrl).searchParams.get("refresh_token");
-    console.log("SUCCESS")
-    console.log(accessToken)
-    console.log(refreshToken)
-    // store token
     if (accessToken && refreshToken) {
-      // Store the tokens in chrome.storage.local
       await chrome.storage.local.set({accessToken: accessToken, refreshToken: refreshToken, tokenTimestamp: Date.now()})
-      console.log("TOKENS SAVED")
       let decodedAccessToken = decodeJWT(accessToken)
-      console.log(decodedAccessToken)
       chrome.alarms.create("refreshToken", {
-        periodInMinutes: 2// Fires every 10 minutes
+        periodInMinutes: decodedAccessToken.expiresInMinutes
       });
 
     }

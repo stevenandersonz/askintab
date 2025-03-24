@@ -39,7 +39,7 @@ function watchForResponse (conversationURL, DEBUG){
   observer.observe(document.body, { childList: true, subtree: true, characterData: true});
 }
 if (DEBUG) console.log("IMPORTING CHATGPT")
-export async function chatGPT(llm){
+export async function chatgpt(llm){
   const {tabId, currentRequest} = llm
   const prompt = PRE_PROMPTS[currentRequest.type] + '\n\n' + currentRequest.getPrompt()
   const conversationURL = await llm.getURL()
