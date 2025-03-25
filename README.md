@@ -1,6 +1,6 @@
-#					 ______
-# Ask In  /  Tab  \
-# ------------------ 
+          ______
+ Ask In  /  Tab  \
+------------------ 
 
 If you already have a llm subscription why can we use them in the browser? 
 OS browser extension prompt LLMs in your tabs (like Grok and ChatGPT) from any webpage.
