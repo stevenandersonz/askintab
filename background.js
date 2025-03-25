@@ -51,7 +51,7 @@ class Request {
     return `${this.question} \n ${this.selectedText}`;
   }
 
-  async saveResponse(response, conversationURL, followUps) {
+  saveResponse(response, conversationURL, followUps) {
     this.responseAt = Date.now();
     this.conversationURL = conversationURL;
     this.status = "completed"
@@ -125,11 +125,10 @@ chrome.runtime.onMessage.addListener( function(message, sender, sendResponse) {
     if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
     clearTimeout(llm.currentRequest)
 
-    llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
 
+    llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
     if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
     chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest}); 
-
     llm.processing = false
     llm.currentRequest = null
     llm.processQueue()
@@ -167,6 +166,7 @@ chrome.runtime.onMessage.addListener( function(message, sender, sendResponse) {
       let ret = Request.findById(cId)
       conversation.push(`### ${ret.question} \n ${ret.response}`)
     }
+
     sendResponse(conversation.join("\n"))
   }
 
