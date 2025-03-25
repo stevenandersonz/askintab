@@ -1,290 +1,340 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>askintab md viewer</title>
-	<style>
-		body {
-			font-family: 'Lucida Console', monospace;
-			background-color: #1e1e1e;
-			color: #ffffff;
-			width: 350px;
-			height: 540px;
-			max-height: 540px;
-			margin: 0;
-			padding: 10px;
-			box-sizing: border-box;
-		}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>askintab md viewer</title>
+    <style>
+        body {
+            font-family: 'Lucida Console', monospace;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            width: 350px;
+            height: 540px;
+            max-height: 540px;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
 
-		.container {
-				position: relative;
-				height: 100%;
-				background-color: #2d2d2d;
-				border-radius: 8px;
-				padding: 15px;
-				box-sizing: border-box;
-		}
+        .container {
+            position: relative;
+            height: 100%;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 15px;
+            box-sizing: border-box;
+        }
 
-		.settings-btn {
-				position: absolute;
-				top: 10px;
-				right: 10px;
-				background: none;
-				border: none;
-				cursor: pointer;
-				padding: 5px;
-		}
+        .settings-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+        }
 
-		.settings-btn svg {
-				fill: #ffffff;
-				width: 20px;
-				height: 20px;
-		}
+        .settings-btn svg {
+            fill: #ffffff;
+            width: 20px;
+            height: 20px;
+        }
 
-		pre {
-				font-size: 24px;
-				margin: 0;
-				font-family: 'Lucida Console', monospace;
-				text-align: center;
-		}
+        pre {
+            font-size: 24px;
+            margin: 0;
+            font-family: 'Lucida Console', monospace;
+            text-align: center;
+        }
 
-		.conversation-section {
-				display: flex;
-				align-items: center;
-				gap: 10px;
-				margin-bottom: 15px;
-		}
+        .conversation-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
 
-		#conversations {
-				flex-grow: 1;
-				padding: 5px;
-				background-color: #3d3d3d;
-				color: #ffffff;
-				border: 1px solid #4d4d4d;
-				border-radius: 4px;
-				cursor: pointer;
-		}
+        #conversations {
+            flex-grow: 1;
+            padding: 5px;
+            background-color: #3d3d3d;
+            color: #ffffff;
+            border: 1px solid #4d4d4d;
+            border-radius: 4px;
+            cursor: pointer;
+        }
 
-		#conversations:focus {
-				outline: none;
-				border-color: #5d5d5d;
-		}
+        #conversations:focus {
+            outline: none;
+            border-color: #5d5d5d;
+        }
 
-		#export-btn {
-				padding: 5px 10px;
-				background-color: #4d4d4d;
-				color: #ffffff;
-				border: none;
-				border-radius: 4px;
-				cursor: pointer;
-				transition: background-color 0.2s;
-		}
+        #export-btn {
+            padding: 5px 10px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
 
-		#export-btn:hover {
-				background-color: #5d5d5d;
-		}
+        #export-btn:hover {
+            background-color: #5d5d5d;
+        }
 
-		.stats {
-				margin-bottom: 15px;
-				font-size: 14px;
-				color: #cccccc;
-		}
+        .stats {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #cccccc;
+        }
 
-		.questions-list {
-				list-style: none;
-				padding: 0;
-				margin: 0;
-				max-height: 350px;
-				overflow-y: auto;
-		}
+        .questions-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 350px;
+            overflow-y: auto;
+        }
 
-		.questions-list li {
-				padding: 8px;
-				margin: 5px 0;
-				background-color: #3d3d3d;
-				border-radius: 4px;
-				cursor: pointer;
-				transition: background-color 0.2s;
-		}
+        .questions-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #3d3d3d;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
 
-		.questions-list li:hover {
-				background-color: #4d4d4d;
-		}
+        .questions-list li:hover {
+            background-color: #4d4d4d;
+        }
 
-		.questions-list li.active {
-				background-color: #5d5d5d;
-		}
+        .questions-list li.active {
+            background-color: #5d5d5d;
+        }
 
-		.settings-panel {
-				display: none;
-				position: absolute;
-				top: 0;
-				left: 0;
-				width: 100%;
-				height: 100%;
-				background-color: #2d2d2d;
-				padding: 15px;
-				border-radius: 8px;
-				box-sizing: border-box;
-				flex-direction: column;
-		}
+        .settings-panel {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            flex-direction: column;
+        }
 
-		.settings-panel.active {
-				display: block;
-		}
+        .settings-panel.active {
+            display: block;
+        }
 
-		.close-btn {
-				position: absolute;
-				top: 10px;
-				right: 10px;
-				background: none;
-				border: none;
-				cursor: pointer;
-				padding: 5px;
-		}
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+        }
 
-		.close-btn svg {
-				fill: #ffffff;
-				width: 20px;
-				height: 20px;
-		}
+        .close-btn svg {
+            fill: #ffffff;
+            width: 20px;
+            height: 20px;
+        }
 
-		.settings-panel h2 {
-				margin: 0 0 15px 0;
-				font-size: 18px;
-		}
+        .settings-panel h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
 
-		.settings-panel label {
-				display: block;
-				margin-bottom: 5px;
-				color: #cccccc;
-		}
+        .settings-panel label {
+            color: #cccccc;
+        }
 
-		#shortcut {
-				width: 100%;
-				padding: 5px;
-				background-color: #3d3d3d;
-				color: #ffffff;
-				border: 1px solid #4d4d4d;
-				border-radius: 4px;
-				box-sizing: border-box;
-		}
+        #shortcut {
+            width: 100%;
+            padding: 5px;
+            background-color: #3d3d3d;
+            color: #ffffff;
+            border: 1px solid #4d4d4d;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
 
-		#shortcut:focus {
-				outline: none;
-				border-color: #5d5d5d;
-		}
+        #shortcut:focus {
+            outline: none;
+            border-color: #5d5d5d;
+        }
 
-		.hidden {
-				display: none;
-		}
-		.section-auth {
-			position:absolute;
-			bottom: 10px;
-			right: 10px;
-		}
-		.google-btn {
-			width: 150px;
-			height: 40px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			background-color: transparent; /* Google Blue */
-			color: white;
-			border: 1px gray;
-			border-radius: 4px;
-			padding: 10px 20px;
-			font-size: 16px;
-			font-family: 'Roboto', Arial, sans-serif; /* Google uses Roboto */
-			cursor: pointer;
-			transition: background-color 0.3s;
-		}
+        .hidden {
+            display: none;
+        }
 
-		.google-btn:hover {
-			border: solid 1px black; /* Darker blue on hover */
-		}
+        .section-auth {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+        }
 
-		.google-logo {
-			width: 20px;
-			height: 20px;
-			margin-right: 10px;
-		}
+        .google-btn {
+            width: 150px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: transparent;
+            color: white;
+            border: 1px solid gray;
+            border-radius: 4px;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-family: 'Roboto', Arial, sans-serif;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
 
-		.section-settings {
-			display: flex;
-			flex-direction: column;
-			height: 100%;
-			width: 100%;
-		}
+        .google-btn:hover {
+            border: solid 1px black;
+        }
 
-</style>
+        .google-logo {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+
+        .section-settings {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .section-settings h3 {
+            margin: 15px 0 10px 0;
+            font-size: 16px;
+        }
+
+        .settings-group {
+            margin-bottom: 15px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .setting-item label {
+            flex: 0 0 60%; /* Adjust this percentage to control label width */
+            margin-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .setting-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+        }
+
+        .setting-item input[type="text"] {
+						width: 50px;
+						text-align: center;
+            flex: 1;
+            padding: 5px;
+            background-color: #3d3d3d;
+            color: #ffffff;
+            border: 1px solid #4d4d4d;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .setting-item input[type="text"]:focus {
+            outline: none;
+            border-color: #5d5d5d;
+        }
+
+        .storage-info {
+            position: absolute;
+            bottom: 10px;
+            left: 15px;
+            font-size: 12px;
+            color: #cccccc;
+        }
+    </style>
 </head>
 <body>
-	<div class="container">
-		<pre>
-					______
+    <div class="container">
+        <pre>
+            ______
 Ask In  /  Tab  \
 ------------------
-		</pre>
-		
-		<div id="main-panel">
-			<button class="settings-btn" id="settings-btn">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-					<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.09-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-				</svg>
-			</button>
-			<div id="no-data"> 
-					<p> No questions asked yet </p>
-			</div>
-			<div id="data" class="hidden">
-				<div class="conversation-section">
-						<select id="conversations">
-						</select>
-						<button id="export-btn">Export</button>
-				</div>
-				<div class="stats">
-						<div>Total Questions: <span id="question-count">0</span></div>
-				</div>
-				<ul class="questions-list" id="questions-list">
-				</ul>
-			</div>
-			<div class="section-auth">
-				<div>
-					<button id="login-btn" class="google-btn">
-						<svg class="google-logo" viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z" fill="#EA4335" />
-							<path d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z" fill="#4285F4" />
-							<path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z" fill="#FBBC05" />
-							<path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.2654 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853" />
-						</svg>
-						<span>
-							Sign in
-						</span>
-					</button>
-				</div>
-				<div class="hidden">
-					<button id="logout-btn" class="google-btn">
-						logout  
-					</button>
-				</div>
-			</div>
-		</div>
-
-	<div class="settings-panel" id="settings-panel">
-		<button class="close-btn" id="close-settings">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-				<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-			</svg>
-		</button>
-		<h2>Settings</h2>
-		<div class="section-settings">
-			<h3>Shortcuts Keys</h3>
-			<label for="shortcut">Ask Question:</label>
-			<input type="text" id="shortcut" placeholder="Press key combination">
-		</div>
-	</div>
-	</div>
-	<script src="popup.js"></script>
+        </pre>
+        
+        <div id="main-panel">
+            <button class="settings-btn" id="settings-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.09-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                </svg>
+            </button>
+            <div id="no-data"> 
+                <p> No questions asked yet </p>
+            </div>
+            <div id="data" class="hidden">
+                <div class="conversation-section">
+                    <select id="conversations">
+                    </select>
+                    <button id="export-btn">Export</button>
+                </div>
+                <div class="stats">
+                    <div>Total Questions: <span id="question-count">0</span></div>
+                </div>
+                <ul class="questions-list" id="questions-list">
+                </ul>
+            </div>
+            <div class="storage-info" id="storage-info">
+                Storage: Calculating...
+            </div>
+            <div class="settings-panel" id="settings-panel">
+                <button class="close-btn" id="close-settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+                <h2>Settings</h2>
+                <div class="section-settings">
+                    <div id="llm-cfg" class="settings-group">
+                        <h3>LLM Config</h3>
+                        <div class="setting-item">
+                            <label for="returnFollowupQuestions">Return Follow-up Questions:</label>
+                            <input type="checkbox" id="returnFollowupQuestions">
+                        </div>
+                        <div class="setting-item">
+                            <label for="mockResponse">Mock Response:</label>
+                            <input type="checkbox" id="mockResponse">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>Shortcuts Keys</h3>
+                        <div class="setting-item">
+                            <label for="prompterShortcut">Ask Question:</label>
+                            <input type="text" id="prompterShortcut" placeholder="Press key combination">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
 </body>
 </html>

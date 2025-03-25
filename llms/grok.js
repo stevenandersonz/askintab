@@ -4,16 +4,16 @@ const BTN_SEND = 'form button[type="submit"]:not(#companion-btn-ask)'
 const TEXTAREA = '.query-bar textarea'
 const PRE_PROMPTS = {
   BASE: (id)=> `Ignore the tag |IGNORE| start your response with |START_REQ_${id}| end your response with |END_REQ_${id}|`, 
-  INIT_CONVERSATION: (returnFollowups) => {
+  INIT_CONVERSATION: (returnFollowupQuestions) => {
     let base = "You can only speak in markdown, if prompted for diagrams default to mermaid.js markdown too, DO NOT BE WOKE, Explain things in layman's terms."
     let fus = " Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself"
-    return returnFollowups ? base + fus : base
+    return returnFollowupQuestions ? base + fus : base
   },
   FOLLOWUP: () => "Rembember to phrase the follow-up questions as further prompts to yourself",
   STANDALONE: () =>  "respond only with what you were asked"
 } 
 
-function watchForResponse (id, conversationURL, returnFollowups){
+function watchForResponse (id, conversationURL, returnFollowupQuestions){
   let log = (msg) => chrome.runtime.sendMessage({type: "DEBUG", payload: msg})
   const observer = new MutationObserver(function(mutationsList) {
     for (const mutation of mutationsList) {
@@ -25,7 +25,7 @@ function watchForResponse (id, conversationURL, returnFollowups){
             if (typeof response === 'string' && response.includes(`|START_REQ_${id}|`) && response.includes(`|END_REQ_${id}|`) && !response.includes("|IGNORE|")) {
               response = response.split('\n').slice(1, -1).join('\n'); 
               let fus = [];
-              if(returnFollowups){
+              if(returnFollowupQuestions){
                 fus = [...response.matchAll(/<question>(.*?)<\/question>/g)].map(match => match[1]);
                 log("FOLLOW UPS: " + fus)
                 response = response.replace(/<question>.*?<\/question>/g, '') 
@@ -42,10 +42,10 @@ function watchForResponse (id, conversationURL, returnFollowups){
 }
 
 export async function grok(llm){
-  const {tabId, currentRequest, returnFollowups } = llm
-  const prompt = PRE_PROMPTS["BASE"](currentRequest.id) + "\n" + PRE_PROMPTS[currentRequest.type](returnFollowups) + "\n" + currentRequest.getPrompt()
+  const {tabId, currentRequest} = llm
+  const prompt = PRE_PROMPTS["BASE"](currentRequest.id) + "\n" + PRE_PROMPTS[currentRequest.type](currentRequest.returnFollowupQuestions) + "\n" + currentRequest.getPrompt()
   const conversationURL = await llm.getURL()
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
-  await chrome.scripting.executeScript({target: {tabId}, args: [currentRequest.id, conversationURL, returnFollowups], func: watchForResponse})
+  await chrome.scripting.executeScript({target: {tabId}, args: [currentRequest.id, conversationURL, currentRequest.returnFollowupQuestions], func: watchForResponse})
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})
 }

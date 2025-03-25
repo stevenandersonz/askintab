@@ -445,10 +445,9 @@ const askInTabExt = (() => {
     });
     
     document.addEventListener("keydown", async (event) => {
-      let data = await chrome.storage.sync.get("shortcut")
-      if (data.shortcut) {
-        
-        let shortcut = data.shortcut.toLowerCase();
+      let {askintab_cfg} = await chrome.storage.local.get("askintab_cfg")
+      if (askintab_cfg) {
+        let shortcut = askintab_cfg.prompterShortcut.toLowerCase();
         let pressedKeys = [];
         if (event.ctrlKey) pressedKeys.push("control");
         if (event.shiftKey) pressedKeys.push("shift");

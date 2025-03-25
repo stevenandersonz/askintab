@@ -7,15 +7,3 @@ export function cleanUrl(url) {
       return url; 
   }
 }
-
-export function decodeJWT(token) {
-  try {
-    const base64Url = token.split(".")[1]; // Get payload part
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/"); // Convert base64url to base64
-    const jsonPayload = atob(base64); // Decode base64 to string
-    return JSON.parse(jsonPayload); // Parse JSON
-  } catch (e) {
-    console.error("Error decoding JWT:", e);
-    return null;
-  }
-}

@@ -1,13 +1,6 @@
 function cleanUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    // Return only protocol, hostname, and pathname
-    return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
-  } catch (e) {
-    // Fallback for invalid URLs
-    console.error('Invalid URL:', url, e);
-    return url; // Return original if parsing fails
-  }
+  const urlObj = new URL(url);
+  return urlObj.protocol + '//' + urlObj.hostname + urlObj.pathname;
 }
 
 function foldText(text){
@@ -24,16 +17,38 @@ function prioritizeActiveUrl(urls, activeUrl) {
   return urls;
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  let ts = await chrome.storage.local.get(["tokenTimestamp"])
-  const loginBtn = document.getElementById('login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  console.log(ts)
-
-  if(Object.keys(ts).length > 0){
-    loginBtn.parentElement.classList.add("hidden")
-    logoutBtn.parentElement.classList.remove("hidden")
+async function setCfg(id, value){
+  try {
+    let {askintab_cfg} = await chrome.storage.local.get("askintab_cfg")
+    askintab_cfg[id] = value
+    await chrome.storage.local.set({askintab_cfg})
+  }catch(e){
+    console.log(e)
   }
+}
+
+function updateStorageInfo() {
+  const rawVersion = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./) 
+  const chromeVersion = rawVersion ? parseInt(rawVersion[2], 10) : false;
+  const totalStorageInBytes = 1048576 * (chromeVersion && chromeVersion >= 114 ? 10 : 5)
+
+
+  chrome.storage.local.getBytesInUse(function(bytesInUse) {
+    const bytesLeft = totalStorageInBytes - bytesInUse;
+    
+    const usedMB = (bytesInUse / 1048576).toFixed(2);
+    const leftMB = (bytesLeft / 1048576).toFixed(2);
+    
+    document.getElementById('storage-info').textContent = 
+        `Storage: ${usedMB}MB used / ${leftMB}MB free`;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  updateStorageInfo();
+  chrome.storage.onChanged.addListener(function() {
+      updateStorageInfo();
+  });
 
   let dataSection = document.querySelector("#data")
   let conversations = document.querySelector("#conversations")
@@ -96,55 +111,47 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsBtn = document.getElementById('settings-btn');
   const settingsPanel = document.getElementById('settings-panel');
   const closeSettings = document.getElementById('close-settings');
+  const llmCfg = document.getElementById("llm-cfg");
+  const promptShorcutInput = document.getElementById("prompterShortcut");
 
-  settingsBtn.addEventListener('click', () => {
-      settingsPanel.classList.add('active');
-  });
-
-  closeSettings.addEventListener('click', () => {
-      settingsPanel.classList.remove('active');
-  });
-
-  // Shortcut key functionality
-  const shortcutInput = document.getElementById("shortcut");
-  let keysPressed = new Set();
-
-  shortcutInput.addEventListener("keydown", (event) => {
-      event.preventDefault();
-      keysPressed.add(event.key);
-      shortcutInput.value = Array.from(keysPressed).join(" + ");
-
-      // Save shortcut to Chrome storage
-      chrome.storage.sync.set({ shortcut: shortcutInput.value });
-  });
-
-  shortcutInput.addEventListener("keyup", () => {
-      keysPressed.clear();
-  });
-
-  // Load stored shortcut
-  chrome.storage.sync.get("shortcut", (data) => {
-    if (data.shortcut) {
-      shortcutInput.value = data.shortcut;
+  document.addEventListener("click", (e) => {
+    if (settingsBtn.contains(e.target)) {
+      settingsPanel.classList.add("active");
+    }
+  
+    if (closeSettings.contains(e.target)) {
+      settingsPanel.classList.remove("active");
     }
   });
 
-  loginBtn.addEventListener("click", async function(){
-    chrome.runtime.sendMessage({ type: "LOGIN" }, (response) => {
-      if (response.status === "initiated") {
-        console.log(response)
-      }
-    });
-  }) 
+  llmCfg.addEventListener("change", async ({target}) => {
+    await setCfg(target.id, target.checked)
+  })
 
-  logoutBtn.addEventListener("click", async function(){
-    chrome.runtime.sendMessage({ type: "LOGOUT" }, (response) => {
-      if (response.status === "initiated") {
-        loginBtn.parentElement.classList.remove("hidden")
-        logoutBtn.parentElement.classList.add("hidden")
-      }
-    });
-  }) 
+  let keysPressed = new Set();
+
+  promptShorcutInput.addEventListener("keydown", async (event) => {
+      event.preventDefault();
+      keysPressed.add(event.key);
+      promptShorcutInput.value = Array.from(keysPressed).join(" + ");
+      console.log( Array.from(keysPressed).join(" + "))
+      await setCfg(promptShorcutInput.id, promptShorcutInput.value)
+  });
+
+  promptShorcutInput.addEventListener("keyup", () => {
+      keysPressed.clear();
+  });
+   
+
+  let cfg = await chrome.storage.local.get("askintab_cfg")
+  if(Object.keys(cfg).length <= 0) return
+  cfg = cfg.askintab_cfg
+  console.log(cfg)
+  promptShorcutInput.value = cfg.prompterShortcut;
+  // TODO it will break if add an input of another type
+  for (let el of llmCfg.querySelectorAll("input")){
+    el.checked = cfg[el.id]
+  }
 
 }); 
   
