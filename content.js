@@ -396,7 +396,7 @@ const askInTabExt = (() => {
         highlight.appendChild(newResponseCnt)
       }
       if(r.type === "FOLLOWUP"){
-        let resCnt = document.querySelector("#" + getClassName("request-" + r.parentId)+" ."+getClassName("response-cnt")) 
+        let resCnt = document.querySelector("#" + getClassName("request-" + r.parentReqId)+" ."+getClassName("response-cnt")) 
         console.log(resCnt)
         let newMdCnt = mdCnt.cloneNode(false) 
         newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.llm.response}`)
