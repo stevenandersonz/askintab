@@ -17,15 +17,7 @@ function prioritizeActiveUrl(urls, activeUrl) {
   return urls;
 }
 
-async function setCfg(id, value){
-  try {
-    let {askintab_cfg} = await chrome.storage.local.get("askintab_cfg")
-    askintab_cfg[id] = value
-    await chrome.storage.local.set({askintab_cfg})
-  }catch(e){
-    console.log(e)
-  }
-}
+
 
 function updateStorageInfo() {
   const rawVersion = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./) 
@@ -53,25 +45,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   let dataSection = document.querySelector("#data")
   let conversations = document.querySelector("#conversations")
   let rs = await chrome.runtime.sendMessage({ type: 'GET_ALL'})
+  console.log(rs)
   let activeTab = await chrome.tabs.query({ active: true, currentWindow: true })
-  let urls = rs.reduce((acc, r) => {
-    if (!acc[r.sender.url])
-      acc[r.sender.url] = []
-    acc[r.sender.url].push(r)
-    return acc
-  }, {})
+  // let urls = rs.reduce((acc, r) => {
+  //   if (!acc[r.sender.url])
+  //     acc[r.sender.url] = []
+  //   acc[r.sender.url].push(r)
+  //   return acc
+  // }, {})
 
-  if(Object.keys(urls).length > 0){
-    dataSection.classList.remove("hidden")
-    document.querySelector("#no-data").classList.add("hidden")
-    let urlSorted = prioritizeActiveUrl(Object.keys(urls), cleanUrl(activeTab[0].url))
-    for(let url of urlSorted){
-      let o = document.createElement("option")
-      o.value = url
-      o.textContent = foldText(urls[url][0].sender.title)
-      conversations.appendChild(o)
-    }
-  }
+  // if(Object.keys(urls).length > 0){
+  //   dataSection.classList.remove("hidden")
+  //   document.querySelector("#no-data").classList.add("hidden")
+  //   let urlSorted = prioritizeActiveUrl(Object.keys(urls), cleanUrl(activeTab[0].url))
+  //   for(let url of urlSorted){
+  //     let o = document.createElement("option")
+  //     o.value = url
+  //     o.textContent = foldText(urls[url][0].sender.title)
+  //     conversations.appendChild(o)
+  //   }
+  // }
 
   conversations.addEventListener("change", async function(evt){
     const questions = urls[evt.target.value].map(r => ({text: r.question, id: "companion-md-" + r.id }));
@@ -111,6 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsBtn = document.getElementById('settings-btn');
   const settingsPanel = document.getElementById('settings-panel');
   const closeSettings = document.getElementById('close-settings');
+  const clearDataBTN = document.getElementById('clear-data-btn');
   const llmCfg = document.getElementById("llm-cfg");
   const promptShorcutInput = document.getElementById("prompterShortcut");
 
@@ -122,10 +116,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (closeSettings.contains(e.target)) {
       settingsPanel.classList.remove("active");
     }
+
+    if (clearDataBTN.contains(e.target)) {
+      clearDataBTN.disable = true
+      clearDataBTN.innerHTML = `<svg width="1em" height="1em" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; display: inline;">
+      <circle cx="25" cy="25" r="20" stroke="blue" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="0">
+        <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+        <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
+      </circle>
+      </svg>`
+      chrome.runtime.sendMessage({type: "CLEAR_REQ"}, (ok) => {
+        clearDataBTN.innerHTML = "Clear all data"
+      })
+    }
   });
 
   llmCfg.addEventListener("change", async ({target}) => {
-    await setCfg(target.id, target.checked)
+    await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[target.id]: target.checked}})
   })
 
   let keysPressed = new Set();
@@ -143,10 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
    
 
-  let cfg = await chrome.storage.local.get("askintab_cfg")
-  if(Object.keys(cfg).length <= 0) return
-  cfg = cfg.askintab_cfg
-  console.log(cfg)
+  let cfg = await chrome.runtime.sendMessage({type: "GET_CFG"})
   promptShorcutInput.value = cfg.prompterShortcut;
   // TODO it will break if add an input of another type
   for (let el of llmCfg.querySelectorAll("input")){

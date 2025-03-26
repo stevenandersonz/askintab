@@ -310,10 +310,10 @@ const askInTabExt = (() => {
   
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
-    newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.response}`) 
+    newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.llm.response}`) 
     newResponseCnt.children[0].id = getClassName("md-"+req.id)
 
-    for(let fu of [...req.followUps, "I want to ask something else"]){
+    for(let fu of [...req.llm.followupsQuestions, "I want to ask something else"]){
       let btn = document.createElement("button")
       btn.className = getClassName("followup-btn") 
       btn.innerText = fu
@@ -399,12 +399,12 @@ const askInTabExt = (() => {
         let resCnt = document.querySelector("#" + getClassName("request-" + r.parentId)+" ."+getClassName("response-cnt")) 
         console.log(resCnt)
         let newMdCnt = mdCnt.cloneNode(false) 
-        newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.response}`)
+        newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.llm.response}`)
         newMdCnt.id = r.id 
         resCnt.lastChild.before(newMdCnt)
         fuCnt = newMdCnt.nextElementSibling
-        for (let i = 0; i < r.followUps.length; i++){
-          fuCnt.children[i].innerText = r.followUps[i]
+        for (let i = 0; i < r.llm.followupsQuestions.length; i++){
+          fuCnt.children[i].innerText = r.llm.followupsQuestions[i]
         }
       }
     }
@@ -421,22 +421,22 @@ const askInTabExt = (() => {
 
   function setupEventListeners(){
 
-    window.addEventListener('hashchange', () => {
-      let mdCnt = document.querySelector(window.location.hash)
-      mdCnt.parentElement.classList.remove(getClassName("hidden"))
-      mdCnt.scrollIntoView({behavior: 'smooth'})
-    })
+    // window.addEventListener('hashchange', () => {
+    //   let mdCnt = document.querySelector(window.location.hash)
+    //   mdCnt.parentElement.classList.remove(getClassName("hidden"))
+    //   mdCnt.scrollIntoView({behavior: 'smooth'})
+    // })
 
-    window.addEventListener('load', async () => {
-      let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
-      if(res.requests.length > 0) loadResponse(res.requests)
-      if(window.location.hash){
-        let mdCnt = document.querySelector(window.location.hash)
-        if(!mdCnt)return
-        mdCnt.parentElement.classList.remove(getClassName("hidden"))
-        mdCnt.scrollIntoView({behavior: 'smooth'})
-      }
-    });
+    // window.addEventListener('load', async () => {
+    //   let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
+    //   if(res.requests.length > 0) loadResponse(res.requests)
+    //   if(window.location.hash){
+    //     let mdCnt = document.querySelector(window.location.hash)
+    //     if(!mdCnt)return
+    //     mdCnt.parentElement.classList.remove(getClassName("hidden"))
+    //     mdCnt.scrollIntoView({behavior: 'smooth'})
+    //   }
+    // });
     
     popoverCloseBtn.addEventListener('click', (e) => {
       popover.classList.remove('open')
@@ -445,9 +445,9 @@ const askInTabExt = (() => {
     });
     
     document.addEventListener("keydown", async (event) => {
-      let {askintab_cfg} = await chrome.storage.local.get("askintab_cfg")
-      if (askintab_cfg) {
-        let shortcut = askintab_cfg.prompterShortcut.toLowerCase();
+      let cfg = await chrome.runtime.sendMessage({type: "GET_CFG"})
+      if (cfg) {
+        let shortcut = cfg.prompterShortcut.toLowerCase();
         let pressedKeys = [];
         if (event.ctrlKey) pressedKeys.push("control");
         if (event.shiftKey) pressedKeys.push("shift");
@@ -528,10 +528,10 @@ const askInTabExt = (() => {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
-        const {type, id, parentId, question, response, followUps } = msg.payload
+        const {type, id, parentId, question, llm } = msg.payload
         if(type === "STANDALONE" && focusedElement){
           document.querySelector("#"+getClassName("waiting")).remove()
-          let pasteEvt = setPasteEvent(response) 
+          let pasteEvt = setPasteEvent(llm.response) 
           focusedElement.focus()
           document.activeElement.dispatchEvent(pasteEvt)
           return
@@ -551,11 +551,11 @@ const askInTabExt = (() => {
           let mdCnt = req.querySelector("."+getClassName("loading"))
           mdCnt.classList.remove(getClassName('loading'));
           mdCnt.id=getClassName("md-"+id)
-          mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${response}`))
+          mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${llm.response}`))
           fuCnt = mdCnt.nextElementSibling
           fuCnt.classList.remove(getClassName("hidden"))
-          for (let i = 0; i < followUps.length; i++){
-            fuCnt.children[i].innerText = followUps[i]
+          for (let i = 0; i < llm.followupsQuestions.length; i++){
+            fuCnt.children[i].innerText = llm.followupsQuestions[i]
           }
           return
         }

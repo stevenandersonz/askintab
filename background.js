@@ -1,99 +1,11 @@
 import LLM from "./llm.js"
-import {cleanUrl} from"./utils/helpers.js"
+import db from "./db.js"
+import {cleanUrl} from"./helpers.js"
 
-const SYNC_LOCAL_PERIOD = 2
 const DEBUG = true
-const DEFAULT_CFG = {
-  mockResponse: false,
-  returnFollowupQuestions: true,
-  prompterShortcut: "Meta + k"
-}
-
-class Request {
-  static state = {
-    data: [],
-    requestsCreated: 0,
-  };
-
-  constructor(llm, question, selectedText, sender, savedRange, type, parentId=null) {
-    this.id = Request.state.requestsCreated;
-    this.selectedText = selectedText;
-    this.createdAt = Date.now();
-    this.responseAt = null;
-    this.question = question;
-    this.conversationURL = null;
-    this.parentId = parentId;
-    this.followUps = [];
-    this.llm = llm;
-    this.status = "pending"
-    this.timeoutId = null
-    this.sender = {
-      id: sender.tab.id,
-      title: sender.tab.title,
-      url: cleanUrl(sender.url)
-    }
-    this.type = type
-    this.savedRange = savedRange 
-    this.conversation = []
-    this.response = null
-    this.mockResponse = false;
-    this.returnFollowupQuestions = false;
-
-    Request.state.data.push(this);
-    Request.state.requestsCreated++;
-    if(type==="FOLLOWUP"){
-      let ret = Request.findById(parentId)
-      if(ret) ret.conversation.push(this.id)
-    }
-  }
-
-  getPrompt() {
-    return `${this.question} \n ${this.selectedText}`;
-  }
-
-  saveResponse(response, conversationURL, followUps) {
-    this.responseAt = Date.now();
-    this.conversationURL = conversationURL;
-    this.status = "completed"
-    this.followUps = followUps
-    this.response = response
-  }
-
-  static getAllRequests() {
-    return this.state.data;
-  }
-
-  static findById(id) {
-    let ret = this.state.data.filter(r => r.id===id)
-    return ret.length === 1 ? ret[0]: null;
-  }
-  
-  static getRequestCount() {
-    return this.state.count;
-  }
-}
-
-chrome.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason === 'update') {
-    console.log('Extension updated from version', details.previousVersion, 'to', chrome.runtime.getManifest().version);
-    let strg = await chrome.storage.local.get(["askintab_data", "askintab_cfg"])
-    if(!strg.askintab_cfg) return await chrome.storage.local.set({ askintab_cfg: DEFAULT_CFG })
-    if(strg.askintab_data && strg.askintab_data.length <= 0) return 
-    Request.state.data = strg.askintab_data
-    Request.state.requestsCreated = Request.state.data.length 
-    
-    chrome.alarms.create("SYNC_LOCAL", { periodInMinutes: SYNC_LOCAL_PERIOD });
-  }
-
-  if (details.reason === 'install') {
-    await chrome.storage.local.set({ askintab_cfg: DEFAULT_CFG })
-    chrome.alarms.create("SYNC_LOCAL", { periodInMinutes: SYNC_LOCAL_PERIOD });
-  }
-});
-
 chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
 chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
-chrome.runtime.onMessage.addListener( function(message, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   const { type, payload } = message
 
   if(type === "LLM_INFO") {
@@ -104,82 +16,115 @@ chrome.runtime.onMessage.addListener( function(message, sender, sendResponse) {
   if (type === "LLM_REQUEST") {
     const { question, selectedText, llm:to, savedRange, type, parentReqId} = payload
     if (!to) sendResponse({ error: `LLM is missing` }); 
-
     let llm = LLM.get(to)
     if (!llm) sendResponse({ error: `LLM ${to} is not available` });
-
     if(DEBUG) console.log(`NEW MESSAGE: ${type} \n ${JSON.stringify(payload)}`)
-
-    const req = new Request(llm.name, question, selectedText, sender, savedRange, type, parentReqId);
-    sendResponse({ id: req.id, status: req.status})
-    chrome.storage.local.get("askintab_cfg").then(({askintab_cfg})=>{
-      req.returnFollowupQuestions = askintab_cfg.returnFollowupQuestions
-      req.mockResponse = askintab_cfg.mockResponse
-      llm.queue.push(req)
-      llm.processQueue() 
+    db.getCfg().then(cfg => {
+      console.log("---cfg---")
+      console.log(cfg)
+      console.log("------")
+      llm = cfg.mockResponse ? LLM.get("mock") : llm
+      const req = {
+        createdAt: Date.now(),
+        question: question,
+        type: type,
+        highlightedText: type === "STANDALONE" ? null : { text: selectedText, range: savedRange },
+        conversation: type === "INIT_CONVERSATION" ? [] : null,
+        // parentId: type === "FOLLOWUP" ? parentId : null,
+        llm: {
+          name: to,
+          response: "",
+          mockResponse: cfg.mockResponse,
+          returnFollowupQuestions: cfg.returnFollowupQuestions,
+          url: null,
+          responseAt: null,
+          followupQuestions: [],
+        },
+        sender: {
+          id: sender.tab.id,
+          title: sender.tab.title,
+          url: cleanUrl(sender.url)
+        },
+        status: "pending",
+        timeoutId: null,
+      }
+      db.createRequest(req).then(r => {
+        console.log("---r---")
+        console.log(r)
+        console.log("------")
+        sendResponse(r) 
+        llm.queue.push(r)
+        llm.processQueue()  
+      })
     })
+    return true
   }
 
   if (type === "LLM_RESPONSE") {
-    let llm = LLM.get(payload.llm)
+    let llm = LLM.get(payload.name)
     if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
     clearTimeout(llm.currentRequest)
-
-
-    llm.currentRequest.saveResponse(payload.raw, payload.conversationURL, payload.followUps)
-    if(DEBUG) console.log(`${payload.llm.toUpperCase()} - REQUEST COMPLETED`)
-    chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest}); 
-    llm.processing = false
-    llm.currentRequest = null
-    llm.processQueue()
+    if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
+    llm.currentRequest.llm = {...llm.currentRequest.llm, ...payload}
+    chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: llm.currentRequest }); 
+    db.updateRequest(llm.currentRequest).then(() => {
+      llm.processing = false
+      llm.currentRequest = null
+      llm.processQueue()
+    });
   }
 
-  if(type === "LOAD_PAGE") {
-    let requests = Request.getAllRequests().filter(req => req.sender.url === cleanUrl(sender.url))
-    sendResponse({requests})
+  if(type === "CLEAR_REQ"){
+    db.clearRequests().then(ok => sendResponse(ok))
+    return true
   }
 
-  if (type === 'PAGE_STATS') {
-    const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
-    const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
-    const questionCount = questions.length
-    sendResponse({ questionCount, questions })
+  if(type === "GET_CFG"){
+    db.getCfg().then(cfg => sendResponse(cfg))
+    return true
   }
+
+  if(type === "PUT_CFG"){
+    db.updateCfg(payload).then(cfg => sendResponse(cfg))
+    return true
+  }
+
+  // if(type === "LOAD_PAGE") {
+  //   let requests = Request.getAllRequests().filter(req => req.sender.url === cleanUrl(sender.url))
+  //   sendResponse({requests})
+  // }
+
+  // if (type === 'PAGE_STATS') {
+  //   const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
+  //   const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
+  //   const questionCount = questions.length
+  //   sendResponse({ questionCount, questions })
+  // }
 
   if (type === 'GET_ALL') {
-    sendResponse(Request.getAllRequests())
+    db.getRequests().then(reqs => sendResponse(reqs))
+    return true
   }
 
-  if (type === 'EXPORT_CONVERSATION') {
-    let conversation = []
-    let req = Request.findById(Number(payload.id))
-    conversation.push(`---
-        \n origin: ${req.sender.url}
-        \n llm: ${req.llm}
-        \n url: ${req.conversationURL}
-        \n highlighted: ${req.selectedText}
-        \n ---
-        \n ### ${req.question} 
-        \n ${req.response}`)
+  // if (type === 'EXPORT_CONVERSATION') {
+  //   let conversation = []
+  //   let req = Request.findById(Number(payload.id))
+  //   conversation.push(`---
+  //       \n origin: ${req.sender.url}
+  //       \n llm: ${req.llm}
+  //       \n url: ${req.conversationURL}
+  //       \n highlighted: ${req.selectedText}
+  //       \n ---
+  //       \n ### ${req.question} 
+  //       \n ${req.response}`)
 
-    for (let cId of req.conversation){
-      let ret = Request.findById(cId)
-      conversation.push(`### ${ret.question} \n ${ret.response}`)
-    }
+  //   for (let cId of req.conversation){
+  //     let ret = Request.findById(cId)
+  //     conversation.push(`### ${ret.question} \n ${ret.response}`)
+  //   }
 
-    sendResponse(conversation.join("\n"))
-  }
+  //   sendResponse(conversation.join("\n"))
+  // }
 
   if(type==="DEBUG" && DEBUG) console.log(payload)
-});
-
-chrome.alarms.onAlarm.addListener(async(alarm) => {
-  if (alarm.name === "SYNC_LOCAL"){
-    try{
-      console.log("SYNCING")
-      await chrome.storage.local.set({ askintab_data: Request.getAllRequests()})
-    }catch(e){
-      console.log(e)
-    }
-  }
 });

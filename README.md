@@ -8,15 +8,13 @@ Got a subscription for Grok? ChatGPT? A fancy browser?
 
 Tired of the same old copy-and-paste hassle just to get a little help from your favorite LLM?
 
-Well, hold onto your hats, folks, ‘cause we’ve got a groovy solution that’ll blow your mind!
-
 Introducing **Ask In Tab** – the far-out new way to ditch the copy-paste grind!
 
 With Ask In Tab, the heavy lifting’s done for you – and get this, the answer pops up right in line, quick as a flash!
 
 No more fuss, no more muss – just pure, outta-sight convenience!
 
-Try Ask In Tab today, and see why it’s the bee’s knees for the modern chatter!
+Try Ask In Tab today for free! and see why it’s the bee’s knees for the modern chatter!
 
 ## Use
 - **Text**: Highlight text, `Cmd+K`, ask, see answer inline.

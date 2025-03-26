@@ -1,4 +1,4 @@
-import {grok, chatgpt} from "./llms/index.js"
+import {grok, chatgpt, mock} from "./llms/index.js"
 
 const TIMEOUT_AFTER = 1000*60*10
 const DEBUG = true
@@ -18,14 +18,10 @@ export default class LLM {
 
   send() {
     if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
-    if (!this.currentRequest.mockResponse) return this.processRequest(this);
-    setTimeout(async() => {
-      this.currentRequest.saveResponse("### " + this.currentRequest.id + " Mock Response\n this is a test \n - 1 \n - 2 \n - 3", '#', ['q1','q2','q3'].map(q => this.currentRequest.id + "-" +q))
-      chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest}); 
-      this.processing = false
-      this.currentRequest = null
-      this.processQueue()
-    }, 1000)
+    console.log("---current---")
+    console.log(this.currentRequest)
+    console.log("------")
+    return this.processRequest(this);
   }
 
   async getURL() {
@@ -55,7 +51,7 @@ export default class LLM {
   }
 
   static get(name){
-    let llm = LLM.llms.find(llm => llm.name === name && llm.tabId) 
+    let llm = LLM.llms.find(llm => llm.name === name) 
     return llm === undefined ? null : llm
   }
 
@@ -72,3 +68,4 @@ export default class LLM {
 
 new LLM('grok', 'grok.com', grok)
 new LLM('chatgpt', 'chatgpt.com', chatgpt)
+new LLM('mock', 'mock.test', mock)

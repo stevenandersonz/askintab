@@ -1,4 +1,4 @@
-import {selectAndWriteTextArea, submitPrompt} from "../utils/dom_helpers.js"
+import {selectAndWriteTextArea, submitPrompt} from "../helpers.js"
 
 const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
@@ -14,7 +14,7 @@ const PRE_PROMPTS = {
   STANDALONE: () => "respond only with what you were asked"
 } 
 
-function watchForResponse (conversationURL, returnFollowupQuestions){
+function watchForResponse (returnFollowupQuestions){
 
   let log = (msg) => chrome.runtime.sendMessage({type: "DEBUG", payload: msg})
   const observer = new MutationObserver(function(mutationsList) {
@@ -34,7 +34,7 @@ function watchForResponse (conversationURL, returnFollowupQuestions){
                 response = response.replace(/<question>.*?<\/question>/g, '') 
                 log("FU: " + fus)
               }
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw: response, llm: "chatgpt", followUps: fus, conversationURL}});
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{response, name: "chatgpt", followupQuestions: fus}});
               observer.disconnect()
             }
           }
@@ -47,9 +47,8 @@ function watchForResponse (conversationURL, returnFollowupQuestions){
 export async function chatgpt(llm){
   const {tabId, currentRequest} = llm
   console.log(currentRequest)
-  const prompt = PRE_PROMPTS[currentRequest.type](currentRequest.returnFollowupQuestions) + '\n\n' + currentRequest.getPrompt()
-  const conversationURL = await llm.getURL()
-  await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
-  await chrome.scripting.executeScript({target: {tabId}, args: [conversationURL, currentRequest.returnFollowupQuestions], func: watchForResponse})
+  const prompt = PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + '\n\n' + `${currentRequest.question} \n ${currentRequest.highlightedText.text}` 
+  await chrome.scripting.executeScript({target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
+  await chrome.scripting.executeScript({target: {tabId}, args: [currentRequest.llm.returnFollowupQuestions], func: watchForResponse})
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})
 }

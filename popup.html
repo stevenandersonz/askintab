@@ -248,8 +248,8 @@
         }
 
         .setting-item input[type="text"] {
-						width: 50px;
-						text-align: center;
+            width: 50px;
+            text-align: center;
             flex: 1;
             padding: 5px;
             background-color: #3d3d3d;
@@ -257,6 +257,24 @@
             border: 1px solid #4d4d4d;
             border-radius: 4px;
             box-sizing: border-box;
+        }
+
+        .setting-item button {
+            width: 50px;
+            text-align: center;
+            flex: 1;
+            padding: 5px;
+            background-color:#4d4d4d ;
+            color: #ffffff;
+            border: 1px solid #3d3d3d;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .setting-item button:hover {
+            border-color:#4d4d4d ;
+            background-color:#3d3d3d; 
+            cursor: pointer;
         }
 
         .setting-item input[type="text"]:focus {
@@ -276,7 +294,7 @@
 <body>
     <div class="container">
         <pre>
-            ______
+         ______
 Ask In  /  Tab  \
 ------------------
         </pre>
@@ -329,6 +347,12 @@ Ask In  /  Tab  \
                         <div class="setting-item">
                             <label for="prompterShortcut">Ask Question:</label>
                             <input type="text" id="prompterShortcut" placeholder="Press key combination">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <h3>DATA: </h3>
+                        <div class="setting-item">
+                            <button id="clear-data-btn"> Clear all data</button>
                         </div>
                     </div>
                 </div>
