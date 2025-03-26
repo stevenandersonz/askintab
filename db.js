@@ -19,7 +19,6 @@ class DB {
         const db = event.target.result;
         const store = db.createObjectStore("requests", { autoIncrement: true });
         store.createIndex("by_url", "sender.url", { unique: false });
-
         db.createObjectStore("config", { keyPath: "key" });
         db.createObjectStore("llms", { keyPath: "name" });
         db.createObjectStore("pages", { keyPath: "url" });

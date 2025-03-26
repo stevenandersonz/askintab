@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     db.getCfg().then(cfg => {
       llm = cfg.mockResponse ? LLM.get("mock") : llm
       const req = {
-        parentReqId: payload.parentReqId ? payload.parentReqId : null,
+        parentReqId: payload.parentReqId ? Number(payload.parentReqId) : null,
         createdAt: Date.now(),
         question: payload.question,
         type: payload.type,
@@ -79,25 +79,19 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   }
 
 
-  // if (type === 'EXPORT_CONVERSATION') {
-  //   let conversation = []
-  //   let req = Request.findById(Number(payload.id))
-  //   conversation.push(`---
-  //       \n origin: ${req.sender.url}
-  //       \n llm: ${req.llm}
-  //       \n url: ${req.conversationURL}
-  //       \n highlighted: ${req.selectedText}
-  //       \n ---
-  //       \n ### ${req.question} 
-  //       \n ${req.response}`)
-
-  //   for (let cId of req.conversation){
-  //     let ret = Request.findById(cId)
-  //     conversation.push(`### ${ret.question} \n ${ret.response}`)
-  //   }
-
-  //   sendResponse(conversation.join("\n"))
-  // }
+  if (type === 'EXPORT_CONVERSATION') {
+    console.log(type)
+    db.getRequestsByUrl(cleanUrl(payload)).then((reqs)=>{
+      console.log("---")
+      console.log(reqs)
+      console.log("---")
+      const inits = {};
+      reqs.forEach(r => r.type === "INIT_CONVERSATION" ? inits[r.createdAt] = { ...r, followupReqs: [] } : r.type === "FOLLOWUP" && r.parentReqId && (inits[r.parentReqId] || {}).followupReqs?.push(r));
+      let text =  reqs.map(r => `\norigin: ${r.sender.url}\nllm: ${r.llm.name}\nurl: ${r.llm.url || 'N/A'}\nhighlighted: ${r.highlightedText?.text || 'N/A'}\n---\n### ${r.question}\n${r.llm.response}${r.type === "INIT_CONVERSATION" ? inits[r.createdAt].followupReqs.map(f => `\n---\n### ${f.question}\n${f.llm.response}`).join('') : ''}`).join('\n\n');
+      sendResponse(text)
+    })
+      //conversation.push(`### ${ret.question} \n ${ret.llm.response}`)
+  }
 
   if(type==="DEBUG" && DEBUG) console.log(payload)
   return true

@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
 
   document.getElementById("export-btn").addEventListener("click", () => {
-    chrome.tabs.create({ url: `mdviewer.html?view=${urls[conversations.value].filter((r) => r.type==="INIT_CONVERSATION")[0].id}` }) 
+    chrome.tabs.create({ url: `mdviewer.html?url=${encodeURIComponent(conversations.value)}` });
   }) 
 
   // Settings panel toggle
