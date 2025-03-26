@@ -1,5 +1,5 @@
 function mockSubmit(){
-  chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{name:"mock", response: "this is a test", followupQuestions: []}});
+  chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{name:"mock", response: "this is a test", followupQuestions: ["1", "2", "3"]}});
 }
 
 export async function mock(llm){

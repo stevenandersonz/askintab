@@ -17,7 +17,9 @@ class DB {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
-        db.createObjectStore("requests", { autoIncrement: true });
+        const store = db.createObjectStore("requests", { autoIncrement: true });
+        store.createIndex("by_url", "sender.url", { unique: false });
+
         db.createObjectStore("config", { keyPath: "key" });
         db.createObjectStore("llms", { keyPath: "name" });
       };
@@ -54,28 +56,40 @@ class DB {
     });
   }
 
+  async getRequestsByUrl(url) {
+    return this.transact("requests", "readonly", (store) => {
+      return new Promise((resolve) => {
+        const index = store.index("by_url"); // Use the index
+        const request = index.getAll(url);   // Get all records where sender.url matches
+        console.log(request)
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => resolve([]); // Fallback to empty array on error
+      });
+    });
+  }
+
   async createRequest(request) {
     return this.transact("requests", "readwrite", (store) => {
       return new Promise((resolve) => {
         const requestOp = store.add(request);
         requestOp.onsuccess = () => {
-          const newId = requestOp.result; // The auto-generated ID
-          const newRequest = { ...request, id: newId };
-          resolve(newRequest);
+          request.id = requestOp.result; // The auto-generated ID
+          store.put(request, request.id)
+          resolve(request);
         };
         requestOp.onerror = () => resolve(null); 
       });
     });
   }
 
-  async updateRequest(requestUpdates) {
-    const currentReq = await this.getRequestById(requestUpdates.id);
+  async updateRequestLLM(id, llm) {
+    let currentReq = await this.getRequestById(id);
     if (!currentReq) return null;
-    const updatedReq = { ...currentReq, ...requestUpdates };
+    currentReq.llm = llm;
     return this.transact("requests", "readwrite", (store) => {
       return new Promise((resolve) => {
-        const requestOp = store.put(updatedReq);
-        requestOp.onsuccess = () => resolve(updatedReq);
+        const requestOp = store.put(currentReq, id);
+        requestOp.onsuccess = () => resolve(currentReq);
         requestOp.onerror = () => resolve(null);
       });
     });

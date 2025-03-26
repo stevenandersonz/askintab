@@ -376,7 +376,7 @@ const askInTabExt = (() => {
     console.log(responses)
     for (let r of responses){
       if(r.type === "INIT_CONVERSATION"){
-        const { startContainerPath, startOffset, endContainerPath, endOffset} = r.savedRange;
+        const { startContainerPath, startOffset, endContainerPath, endOffset} = r.highlightedText.range;
         const startNode = findNodeByPath(startContainerPath);
         const endNode = findNodeByPath(endContainerPath);
         const range = document.createRange();
@@ -427,16 +427,16 @@ const askInTabExt = (() => {
     //   mdCnt.scrollIntoView({behavior: 'smooth'})
     // })
 
-    // window.addEventListener('load', async () => {
-    //   let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
-    //   if(res.requests.length > 0) loadResponse(res.requests)
-    //   if(window.location.hash){
-    //     let mdCnt = document.querySelector(window.location.hash)
-    //     if(!mdCnt)return
-    //     mdCnt.parentElement.classList.remove(getClassName("hidden"))
-    //     mdCnt.scrollIntoView({behavior: 'smooth'})
-    //   }
-    // });
+    window.addEventListener('load', async () => {
+      let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
+      if(res.length > 0) loadResponse(res)
+      if(window.location.hash){
+        let mdCnt = document.querySelector(window.location.hash)
+        if(!mdCnt)return
+        mdCnt.parentElement.classList.remove(getClassName("hidden"))
+        mdCnt.scrollIntoView({behavior: 'smooth'})
+      }
+    });
     
     popoverCloseBtn.addEventListener('click', (e) => {
       popover.classList.remove('open')
