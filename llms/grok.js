@@ -43,8 +43,9 @@ function watchForResponse (id, returnFollowupQuestions){
 
 export async function grok(llm){
   const {tabId, currentRequest} = llm
-  const prompt = PRE_PROMPTS["BASE"](Math.floor(Math.random() * 1000) + 1) + "\n" + PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + "\n" + `${currentRequest.question} \n ${currentRequest.highlightedText.text}`
+  let id = Math.floor(Math.random() * 1000) + 1
+  const prompt = PRE_PROMPTS["BASE"](id) + "\n" + PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + "\n" + `${currentRequest.question} \n ${currentRequest.highlightedText.text}`
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
-  await chrome.scripting.executeScript({target: {tabId}, args: [currentRequest.id, currentRequest.llm.returnFollowupQuestions], func: watchForResponse})
+  await chrome.scripting.executeScript({target: {tabId}, args: [id, currentRequest.llm.returnFollowupQuestions], func: watchForResponse})
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})
 }

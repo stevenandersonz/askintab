@@ -313,7 +313,7 @@ const askInTabExt = (() => {
     newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.llm.response}`) 
     newResponseCnt.children[0].id = getClassName("md-"+req.id)
 
-    for(let fu of [...req.llm.followupsQuestions, "I want to ask something else"]){
+    for(let fu of [...req.llm.followupQuestions, "I want to ask something else"]){
       let btn = document.createElement("button")
       btn.className = getClassName("followup-btn") 
       btn.innerText = fu
@@ -403,8 +403,8 @@ const askInTabExt = (() => {
         newMdCnt.id = r.id 
         resCnt.lastChild.before(newMdCnt)
         fuCnt = newMdCnt.nextElementSibling
-        for (let i = 0; i < r.llm.followupsQuestions.length; i++){
-          fuCnt.children[i].innerText = r.llm.followupsQuestions[i]
+        for (let i = 0; i < r.llm.followupQuestions.length; i++){
+          fuCnt.children[i].innerText = r.llm.followupQuestions[i]
         }
       }
     }
@@ -528,7 +528,7 @@ const askInTabExt = (() => {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === "LLM_RESPONSE") {
         console.log(msg.payload)
-        const {type, id, parentId, question, llm } = msg.payload
+        const {type, id, parentReqId, question, llm } = msg.payload
         if(type === "STANDALONE" && focusedElement){
           document.querySelector("#"+getClassName("waiting")).remove()
           let pasteEvt = setPasteEvent(llm.response) 
@@ -547,15 +547,15 @@ const askInTabExt = (() => {
         } 
 
         if(type === "FOLLOWUP" ){
-          let req = document.querySelector("#" + getClassName("request-" + parentId)) 
+          let req = document.querySelector("#" + getClassName("request-" + parentReqId)) 
           let mdCnt = req.querySelector("."+getClassName("loading"))
           mdCnt.classList.remove(getClassName('loading'));
           mdCnt.id=getClassName("md-"+id)
           mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${llm.response}`))
           fuCnt = mdCnt.nextElementSibling
           fuCnt.classList.remove(getClassName("hidden"))
-          for (let i = 0; i < llm.followupsQuestions.length; i++){
-            fuCnt.children[i].innerText = llm.followupsQuestions[i]
+          for (let i = 0; i < llm.followupQuestions.length; i++){
+            fuCnt.children[i].innerText = llm.followupQuestions[i]
           }
           return
         }
