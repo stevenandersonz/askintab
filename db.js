@@ -3,7 +3,7 @@ class DB {
     this.DEFAULT_CFG = {
       mockResponse: false,
       returnFollowupQuestions: true,
-      prompterShortcut: "Meta + k"
+      prompterShortcut: "Control + k"
     };
     this.dbName = "askintab_db";
     this.dbVersion = 1;
@@ -22,6 +22,7 @@ class DB {
 
         db.createObjectStore("config", { keyPath: "key" });
         db.createObjectStore("llms", { keyPath: "name" });
+        db.createObjectStore("pages", { keyPath: "url" });
       };
 
       request.onsuccess = () => resolve(request.result);
@@ -122,6 +123,7 @@ class DB {
   }
 
   async updateCfg(cfg) {
+    console.log(cfg)
     const currentCfg = await this.getCfg();
     const updatedCfg = { ...currentCfg, ...cfg };
     return this.transact("config", "readwrite", (store) => {
@@ -132,24 +134,25 @@ class DB {
     });
   }
 
-  // // LLM Operations
-  // async getLLMs() {
-  //   return this.transact("llms", "readonly", (store) => {
-  //     return new Promise((resolve) => {
-  //       const request = store.getAll();
-  //       request.onsuccess = () => resolve(request.result);
-  //     });
-  //   });
-  // }
 
-  // async setLLM(llm) {
-  //   return this.transact("llms", "readwrite", (store) => {
-  //     return new Promise((resolve) => {
-  //       const request = store.put(llm);
-  //       request.onsuccess = () => resolve(llm);
-  //     });
-  //   });
-  // }
+  async getPages() {
+    return this.transact("pages", "readonly", (store) => {
+      return new Promise((resolve) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result.map(r => r.url));
+      });
+    });
+  }
+
+  async addPage(url) {
+    return this.transact("pages", "readwrite", (store) => {
+      return new Promise((resolve) => {
+        const request = store.put({ url });
+        request.onsuccess = () => resolve(url);
+      });
+    });
+  }
+
 }
 
 export default new DB()

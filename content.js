@@ -421,14 +421,14 @@ const askInTabExt = (() => {
 
   function setupEventListeners(){
 
-    // window.addEventListener('hashchange', () => {
-    //   let mdCnt = document.querySelector(window.location.hash)
-    //   mdCnt.parentElement.classList.remove(getClassName("hidden"))
-    //   mdCnt.scrollIntoView({behavior: 'smooth'})
-    // })
+    window.addEventListener('hashchange', () => {
+      let mdCnt = document.querySelector(window.location.hash)
+      mdCnt.parentElement.classList.remove(getClassName("hidden"))
+      mdCnt.scrollIntoView({behavior: 'smooth'})
+    })
 
     window.addEventListener('load', async () => {
-      let res = await chrome.runtime.sendMessage({ type: "LOAD_PAGE" })
+      let res = await chrome.runtime.sendMessage({ type: "GET_BY_URL", payload: document.URL })
       if(res.length > 0) loadResponse(res)
       if(window.location.hash){
         let mdCnt = document.querySelector(window.location.hash)

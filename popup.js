@@ -18,56 +18,28 @@ function prioritizeActiveUrl(urls, activeUrl) {
 }
 
 
-
-function updateStorageInfo() {
-  const rawVersion = navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./) 
-  const chromeVersion = rawVersion ? parseInt(rawVersion[2], 10) : false;
-  const totalStorageInBytes = 1048576 * (chromeVersion && chromeVersion >= 114 ? 10 : 5)
-
-
-  chrome.storage.local.getBytesInUse(function(bytesInUse) {
-    const bytesLeft = totalStorageInBytes - bytesInUse;
-    
-    const usedMB = (bytesInUse / 1048576).toFixed(2);
-    const leftMB = (bytesLeft / 1048576).toFixed(2);
-    
-    document.getElementById('storage-info').textContent = 
-        `Storage: ${usedMB}MB used / ${leftMB}MB free`;
-  });
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
-  updateStorageInfo();
-  chrome.storage.onChanged.addListener(function() {
-      updateStorageInfo();
-  });
-
   let dataSection = document.querySelector("#data")
   let conversations = document.querySelector("#conversations")
-  let rs = await chrome.runtime.sendMessage({ type: 'GET_ALL'})
-  console.log(rs)
+  let urls = await chrome.runtime.sendMessage({ type: 'GET_URLS'})
+  console.log("URLS")
+  console.log(urls)
   let activeTab = await chrome.tabs.query({ active: true, currentWindow: true })
-  // let urls = rs.reduce((acc, r) => {
-  //   if (!acc[r.sender.url])
-  //     acc[r.sender.url] = []
-  //   acc[r.sender.url].push(r)
-  //   return acc
-  // }, {})
 
-  // if(Object.keys(urls).length > 0){
-  //   dataSection.classList.remove("hidden")
-  //   document.querySelector("#no-data").classList.add("hidden")
-  //   let urlSorted = prioritizeActiveUrl(Object.keys(urls), cleanUrl(activeTab[0].url))
-  //   for(let url of urlSorted){
-  //     let o = document.createElement("option")
-  //     o.value = url
-  //     o.textContent = foldText(urls[url][0].sender.title)
-  //     conversations.appendChild(o)
-  //   }
-  // }
+  if(urls.length <= 0) return
+  dataSection.classList.remove("hidden")
+  document.querySelector("#no-data").classList.add("hidden")
+  let urlSorted = prioritizeActiveUrl(urls, cleanUrl(activeTab[0].url))
+  for(let url of urlSorted){
+    let o = document.createElement("option")
+    o.value = url
+    o.textContent = foldText(url)
+    conversations.appendChild(o)
+  }
 
   conversations.addEventListener("change", async function(evt){
-    const questions = urls[evt.target.value].map(r => ({text: r.question, id: "companion-md-" + r.id }));
+    const reqs = await chrome.runtime.sendMessage({type: "GET_BY_URL", payload: evt.target.value})
+    const questions = reqs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
     const questionCount = questions.length
     if(questionCount > 0){
       document.getElementById('question-count').textContent = questionCount;
@@ -142,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       keysPressed.add(event.key);
       promptShorcutInput.value = Array.from(keysPressed).join(" + ");
       console.log( Array.from(keysPressed).join(" + "))
-      await setCfg(promptShorcutInput.id, promptShorcutInput.value)
+      await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[promptShorcutInput.id]: promptShorcutInput.value}})
   });
 
   promptShorcutInput.addEventListener("keyup", () => {

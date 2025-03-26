@@ -43,6 +43,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         sendResponse(r) 
         llm.send(r)
       })
+
+      db.addPage(req.sender.url)
     })
     return true
   }
@@ -62,19 +64,19 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if(type === "GET_CFG") db.getCfg().then(cfg => sendResponse(cfg))
   if(type === "PUT_CFG") db.updateCfg(payload).then(cfg => sendResponse(cfg))
   if (type === 'GET_ALL') db.getRequests().then(reqs => sendResponse(reqs))
-  if(type === "LOAD_PAGE"){
-    db.getRequestsByUrl(sender.url).then(reqs =>{
-      console.log(reqs)
-      sendResponse(reqs)
-    })
-  } 
+  if(type === "GET_BY_URL") db.getRequestsByUrl(cleanUrl(payload)).then(reqs => sendResponse(reqs))
+  if(type === "GET_URLS"){
+    db.getPages().then(urls => {
+      console.log(urls)
+      sendResponse(urls)})
+  }
 
-  // if (type === 'PAGE_STATS') {
-  //   const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
-  //   const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
-  //   const questionCount = questions.length
-  //   sendResponse({ questionCount, questions })
-  // }
+  if (type === 'PAGE_STATS') {
+    const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
+    const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
+    const questionCount = questions.length
+    sendResponse({ questionCount, questions })
+  }
 
 
   // if (type === 'EXPORT_CONVERSATION') {
