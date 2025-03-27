@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log(urls)
   let activeTab = await chrome.tabs.query({ active: true, currentWindow: true })
 
-  if(urls.length <= 0) return
+  if(urls.length > 0){ 
   dataSection.classList.remove("hidden")
   document.querySelector("#no-data").classList.add("hidden")
   let urlSorted = prioritizeActiveUrl(urls, cleanUrl(activeTab[0].url))
@@ -71,6 +71,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById("export-btn").addEventListener("click", () => {
     chrome.tabs.create({ url: `mdviewer.html?url=${encodeURIComponent(conversations.value)}` });
   }) 
+
+  }
 
   document.getElementById("settings-btn").addEventListener("click", () => {
     chrome.tabs.create({ url: `settings.html` });

@@ -3,17 +3,6 @@ import {selectAndWriteTextArea, submitPrompt} from "../helpers.js"
 const BTN_SEND = 'button[data-testid="send-button"]'
 const TEXTAREA = '#prompt-textarea'
 
-const PRE_PROMPTS = {
-  BASE: "",
-  INIT_CONVERSATION:(returnFollowupQuestions) => {
-    let base =  "if prompted for diagrams default to mermaid.js markdown too."
-    let fu = " Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself"
-    return returnFollowupQuestions ? base + fu : base 
-  },
-  FOLLOWUP: () => "Rembember to phrase the follow-up questions as further prompts to yourself",
-  STANDALONE: () => "respond only with what you were asked"
-} 
-
 function watchForResponse (returnFollowupQuestions){
 
   let log = (msg) => chrome.runtime.sendMessage({type: "DEBUG", payload: msg})
@@ -44,10 +33,10 @@ function watchForResponse (returnFollowupQuestions){
   });
   observer.observe(document.body, { childList: true, subtree: true, characterData: true});
 }
-export async function chatgpt(llm, cfg){
-  const {tabId, currentRequest} = llm
-  console.log(cfg[llm.name+"-cfg"])
-  const prompt = cfg[llm.name+"-cfg"] + PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + '\n\n' + `${currentRequest.question} \n ${currentRequest.highlightedText.text}` 
+
+export async function chatgpt(provider, setProviderPrompt){
+  const {tabId, currentRequest} = provider
+  const prompt = setProviderPrompt("") 
   await chrome.scripting.executeScript({target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
   await chrome.scripting.executeScript({target: {tabId}, args: [currentRequest.llm.returnFollowupQuestions], func: watchForResponse})
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})

@@ -3,7 +3,9 @@ class DB {
     this.DEFAULT_CFG = {
       mockResponse: false,
       returnFollowupQuestions: true,
-      prompterShortcut: "Control + k"
+      prompterShortcut: "Control + k",
+      chatgptCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would.",
+      grokCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would."
     };
     this.dbName = "askintab_db";
     this.dbVersion = 1;

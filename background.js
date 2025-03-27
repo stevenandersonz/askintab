@@ -2,7 +2,7 @@ import LLM from "./llm.js"
 import db from "./db.js"
 import {cleanUrl} from"./helpers.js"
 
-const DEBUG = false
+const DEBUG = true
 chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
 chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {

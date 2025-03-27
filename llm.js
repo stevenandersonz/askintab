@@ -2,7 +2,21 @@ import {grok, chatgpt, mock} from "./llms/index.js"
 import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*10
-const DEBUG = true
+const PRE_PROMPTS = {
+  INIT_CONVERSATION: ({returnFollowupQuestions}) => {
+    let base = "if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>, for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div"
+    let fus = " Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself"
+    return returnFollowupQuestions ? base + fus : base
+  },
+  FOLLOWUP: () => "Rembember to phrase the follow-up questions as further prompts to yourself",
+  STANDALONE: () =>  "respond only with what you were asked"
+} 
+function buildPrompt(llm, cfg){
+  const {highlightedText, question} = llm.currentRequest
+  let userPrompt = (highlightedText ? highlightedText.text + "\n" : "") + question 
+  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type](cfg)
+  return function getProviderPrompt (pPrompt) { return `${pPrompt}\n${systemPrompt}\n${userPrompt}` } 
+}
 
 export default class LLM {
   static llms = []
@@ -20,7 +34,6 @@ export default class LLM {
 
   async send(req) {
     this.currentRequest = req
-    if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
     this.lastUsed = Date.now();
     this.timeoutId = setTimeout(() => {
       if (this.currentRequest === req) {
@@ -30,7 +43,7 @@ export default class LLM {
       }
     }, TIMEOUT_AFTER);
     let cfg = await db.getCfg() 
-    return this.provider(this, cfg);
+    return this.provider(this, buildPrompt(this, cfg));
   }
 
   clear(){
@@ -39,7 +52,6 @@ export default class LLM {
 
   async getURL() {
     let tab = await chrome.tabs.get(this.tabId);
-    if (DEBUG) console.log(`${this.name.toUpperCase()} URL: ${tab.url}`);
     return tab.url;
   }
 
