@@ -1,38 +1,4 @@
-[x] support multiple requests chatgpt
-[x] support diagrams
-[X] problem with new chat in chatgpt 
-[x] default last used llm in dropdown 
-[x] support multiple requests grok
-[x] support queries without selection
-[x] support key bind command for quick queries 
-[x] support setting key bind on popup
-[x] grok is complaining about detaching debugger
-[x] chatgpt doesnt need debugger
-[x] improve ux
-[x] support base prompt as text file per llm 
-[x] grok empty chat -> Response Body: {"result":{"title":{"newTitle":"Definition and Usage of \"Prig\""}}} 
-[x] save/load annotations after page reload
-[x] fix styles for updating responses
-[x] support ranges in update responses
-[x] support input responses
-[x] support editable element responses
-[x] support grok without a debugger 
-[x] remove annotations name -> requests all the way 
-[x] bug edit cursor is at the end response is copied twice
-[x] added suggestion responses 
-[x] suport "ask myself box" + if response is open default prompter to there 
-[x] request over the same response should be linked 
-[x] write tweet + email using askintab prompter
-[x] add loading spinners for followups and standalone questions
-[x] refactor sneder in Requests
-[x] fix len url title in popover 
-[x] sort the default title by current page 
-[x] how do we make sure the url is saved without any hash
-[x] question lookup
-[x] export conversation markdown 
-[x] make popup good enough 
 [] when loading highlight into a url check if text match if not alert 
-
 [] add alert for prompt too large
 [] what can we do if prompt too large 
 [] support new chat creation 

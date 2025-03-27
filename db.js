@@ -61,7 +61,6 @@ class DB {
       return new Promise((resolve) => {
         const index = store.index("by_url"); // Use the index
         const request = index.getAll(url);   // Get all records where sender.url matches
-        console.log(request)
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => resolve([]); // Fallback to empty array on error
       });

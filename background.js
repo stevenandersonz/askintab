@@ -6,7 +6,6 @@ const DEBUG = true
 chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
 chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-  console.log("HERE")
   const { type, payload } = message
   if (type === "LLM_REQUEST") {
     if (!payload.llm) sendResponse({ error: `LLM is missing` }); 
@@ -65,34 +64,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if(type === "PUT_CFG") db.updateCfg(payload).then(cfg => sendResponse(cfg))
   if (type === 'GET_ALL') db.getRequests().then(reqs => sendResponse(reqs))
   if(type === "GET_BY_URL") db.getRequestsByUrl(cleanUrl(payload)).then(reqs => sendResponse(reqs))
-  if(type === "GET_URLS"){
-    db.getPages().then(urls => {
-      console.log(urls)
-      sendResponse(urls)})
-  }
-
-  if (type === 'PAGE_STATS') {
-    const rs = Request.getAllRequests().filter(r => r.url === payload.url && r.type !== "STANDALONE");
-    const questions = rs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
-    const questionCount = questions.length
-    sendResponse({ questionCount, questions })
-  }
-
-
-  if (type === 'EXPORT_CONVERSATION') {
-    console.log(type)
-    db.getRequestsByUrl(cleanUrl(payload)).then((reqs)=>{
-      console.log("---")
-      console.log(reqs)
-      console.log("---")
-      const inits = {};
-      reqs.forEach(r => r.type === "INIT_CONVERSATION" ? inits[r.createdAt] = { ...r, followupReqs: [] } : r.type === "FOLLOWUP" && r.parentReqId && (inits[r.parentReqId] || {}).followupReqs?.push(r));
-      let text =  reqs.map(r => `\norigin: ${r.sender.url}\nllm: ${r.llm.name}\nurl: ${r.llm.url || 'N/A'}\nhighlighted: ${r.highlightedText?.text || 'N/A'}\n---\n### ${r.question}\n${r.llm.response}${r.type === "INIT_CONVERSATION" ? inits[r.createdAt].followupReqs.map(f => `\n---\n### ${f.question}\n${f.llm.response}`).join('') : ''}`).join('\n\n');
-      sendResponse(text)
-    })
-      //conversation.push(`### ${ret.question} \n ${ret.llm.response}`)
-  }
-
+  if(type === "GET_URLS") db.getPages().then(urls => sendResponse(urls))
   if(type==="DEBUG" && DEBUG) console.log(payload)
   return true
 });
