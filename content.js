@@ -2,7 +2,7 @@ const askInTabExt = (() => {
   //---
   // GLOBALS
   //---  
-  const EXT_NAME = "companion"
+  const EXT_NAME = "askintab"
   let savedRange = null
   let focusedElement = null
 

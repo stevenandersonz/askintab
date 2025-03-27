@@ -5,10 +5,7 @@
   "permissions": [
     "tabs",
     "scripting",
-    "activeTab",
-    "storage",
-    "identity",
-    "alarms"
+    "activeTab"
   ],
   "host_permissions": [
     "<all_urls>"

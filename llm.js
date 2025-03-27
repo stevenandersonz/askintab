@@ -1,4 +1,5 @@
 import {grok, chatgpt, mock} from "./llms/index.js"
+import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*10
 const DEBUG = true
@@ -17,11 +18,8 @@ export default class LLM {
     LLM.llms.push(this)
   }
 
-  send(req) {
+  async send(req) {
     this.currentRequest = req
-    console.log("---current---")
-    console.log(this.currentRequest)
-    console.log("------")
     if (DEBUG) console.log(`${this.name.toUpperCase()} IS PROCESSING REQUEST: \n ${JSON.stringify(this.currentRequest)} \n`);
     this.lastUsed = Date.now();
     this.timeoutId = setTimeout(() => {
@@ -31,7 +29,8 @@ export default class LLM {
         this.clear()
       }
     }, TIMEOUT_AFTER);
-    return this.provider(this);
+    let cfg = await db.getCfg() 
+    return this.provider(this, cfg);
   }
 
   clear(){

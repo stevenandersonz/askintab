@@ -5,7 +5,7 @@ const TEXTAREA = '.query-bar textarea'
 const PRE_PROMPTS = {
   BASE: (id) => `Ignore the tag |IGNORE| start your response with |START_REQ_${id}| end your response with |END_REQ_${id}|`, 
   INIT_CONVERSATION: (returnFollowupQuestions) => {
-    let base = "You can only speak in markdown, if prompted for diagrams default to mermaid.js markdown too, DO NOT BE WOKE, Explain things in layman's terms."
+    let base = "if prompted for diagrams default to mermaid.js markdown too"
     let fus = " Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself"
     return returnFollowupQuestions ? base + fus : base
   },
@@ -41,10 +41,10 @@ function watchForResponse (id, returnFollowupQuestions){
   observer.observe(document.body, { childList: true, subtree: true, characterData: true});
 }
 
-export async function grok(llm){
+export async function grok(llm, cfg){
   const {tabId, currentRequest} = llm
   let id = Math.floor(Math.random() * 1000) + 1
-  const prompt = PRE_PROMPTS["BASE"](id) + "\n" + PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + "\n" + `${currentRequest.question} \n ${currentRequest.highlightedText.text}`
+  const prompt = cfg[llm.name+"-cfg"] + PRE_PROMPTS["BASE"](id) + "\n" + PRE_PROMPTS[currentRequest.type](currentRequest.llm.returnFollowupQuestions) + "\n" + `${currentRequest.question} \n ${currentRequest.highlightedText.text}`
   await chrome.scripting.executeScript({ target: { tabId }, args: [TEXTAREA, prompt], func: selectAndWriteTextArea})
   await chrome.scripting.executeScript({target: {tabId}, args: [id, currentRequest.llm.returnFollowupQuestions], func: watchForResponse})
   await chrome.scripting.executeScript({target: {tabId}, args: [BTN_SEND], func: submitPrompt})
