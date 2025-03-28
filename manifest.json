@@ -16,7 +16,7 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "128": "./public/askintab.png"
+      "128": "./askintab.png"
     }
   },
   "content_scripts": [
