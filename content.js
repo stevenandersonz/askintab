@@ -298,6 +298,11 @@ const askInTabExt = (() => {
     let link = rLink.cloneNode(true)
     link.addEventListener("click", function(e){
       e.preventDefault(); // Prevent default link behavior
+      if(this.textContent == "[retry]"){
+        chrome.runtime.sendMessage({type: "RETRY", payload: {id: Number(this.parentElement.id.split("-")[2])}})
+        this.innerHTML = `[${spinner}]`
+        return
+      }
       let responseCnt = this.nextElementSibling
       if (responseCnt && responseCnt.tagName === "DIV"){
         responseCnt.classList.toggle(getClassName('hidden')); // Toggle visibility
@@ -562,11 +567,12 @@ const askInTabExt = (() => {
       }
       // Send data to popup when requested
 
-      if (msg.type === "LLM_TIMEOUT") {
+      if (msg.type === "ERROR") {
         const { id } = msg.payload
-        let pendingLink = document.querySelector('.'+getClassName(`link-${id}`));
+        console.log(msg.payload)
+        let highlight = document.querySelector(`#${getClassName('request-'+id)}`);
+        let pendingLink = highlight.querySelector("a") 
         pendingLink.innerText = `[retry]`;
-        pendingLink.classList.remove(getClassName("loading"))
       }
         
     });

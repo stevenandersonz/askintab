@@ -17,7 +17,14 @@ graph TD
     I[Creatine Phosphate] -->|Quick Burst| E
 </div>
 This little chart shows how those four “batteries” feed into the system. Glucose or glycogen kicks things off with glycolysis, fats get broken down via beta-oxidation, proteins chip in through amino acids, and creatine phosphate gives a fast jolt—all funneling energy toward ATP synthase, which slaps that phosphate onto ADP. The proton gradient from the electron transport chain is the real powerhouse here—it’s like water turning a mill wheel.`
-  chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{name:"mock", response, followupQuestions: ["1", "2", "3"]}});
+  // setTimeout(function(){
+  //   chrome.runtime.sendMessage({ type: "HEALTH", payload:{name:"mock"}});
+  // }, 1000*20)
+  chrome.runtime.sendMessage({ type: "DEBUG", payload: "waiting 10s"});
+  setTimeout(function(){
+    chrome.runtime.sendMessage({ type: "DEBUG", payload: "RESPONS AFTER 10s"});
+    chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{name:"grok", response, followupQuestions: ["1", "2", "3"]}});
+  }, 1000*10)
 }
 
 export async function mock(llm){

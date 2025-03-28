@@ -1,7 +1,7 @@
 import {grok, chatgpt, mock} from "./llms/index.js"
 import db from "./db.js"
 
-const TIMEOUT_AFTER = 1000*60*10
+const TIMEOUT_AFTER = 1000*60
 const PRE_PROMPTS = {
   INIT_CONVERSATION: ({returnFollowupQuestions}) => {
     let base = "if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>, for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div"
@@ -32,22 +32,25 @@ export default class LLM {
     LLM.llms.push(this)
   }
 
-  async send(req) {
-    this.currentRequest = req
+  async send(req, timerOffset=0) {
     this.lastUsed = Date.now();
-    this.timeoutId = setTimeout(() => {
-      if (this.currentRequest === req) {
-        console.log(`REQUEST TIMEOUT ${this.name}`);
-        req.status="failed"
-        this.clear()
-      }
-    }, TIMEOUT_AFTER);
     let cfg = await db.getCfg() 
-    return this.provider(this, buildPrompt(this, cfg));
+    req.llm.mockResponse = cfg.mockResponse
+    req.llm.name = cfg.mockResponse ? 'mock' : this.name,
+    req.llm.returnFollowupQuestions = cfg.returnFollowupQuestions,
+    this.currentRequest = req
+    this.setTimer(timerOffset)
+    return cfg.mockResponse ? mock(this) : this.provider(this, buildPrompt(this, cfg));
   }
 
-  clear(){
-    this.currentRequest = null;
+  setTimer (timerOffset){
+    if(this.timeoutId) clearTimeout(this.timeoutId)
+    this.timeoutId = setTimeout(() => {
+      console.log(`REQUEST TIMEOUT ${this.name}`);
+      this.currentRequest.status="failed"
+      chrome.tabs.sendMessage(this.currentRequest.sender.id, {type: "ERROR", payload: this.currentRequest})
+      this.currentRequest=null
+    }, TIMEOUT_AFTER + timerOffset); 
   }
 
   async getURL() {
@@ -73,4 +76,3 @@ export default class LLM {
 
 new LLM('grok', 'grok.com', grok)
 new LLM('chatgpt', 'chatgpt.com', chatgpt)
-new LLM('mock', 'mock.test', mock)

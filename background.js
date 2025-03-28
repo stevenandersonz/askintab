@@ -11,40 +11,36 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if (!payload.llm) sendResponse({ error: `LLM is missing` }); 
     let llm = LLM.get(payload.llm)
     if (!llm) sendResponse({ error: `LLM ${payload.llm} is not available` });
-    db.getCfg().then(cfg => {
-      llm = cfg.mockResponse ? LLM.get("mock") : llm
-      const req = {
-        parentReqId: payload.parentReqId ? Number(payload.parentReqId) : null,
-        createdAt: Date.now(),
-        question: payload.question,
-        type: payload.type,
-        highlightedText: payload.type === "STANDALONE" ? null : { text: payload.selectedText, range: payload.savedRange },
-        conversation: payload.type === "INIT_CONVERSATION" ? [] : null,
-        llm: {
-          name: payload.llm,
-          response: "",
-          mockResponse: cfg.mockResponse,
-          returnFollowupQuestions: cfg.returnFollowupQuestions,
-          url: null,
-          responseAt: null,
-          followupQuestions: [],
-        },
-        sender: {
-          id: sender.tab.id,
-          title: sender.tab.title,
-          url: cleanUrl(sender.url)
-        },
-        status: "pending",
-        timeoutId: null,
-      }
-
-      db.createRequest(req).then(r => {
-        sendResponse(r) 
-        llm.send(r)
-      })
-
+    const req = {
+      parentReqId: payload.parentReqId ? Number(payload.parentReqId) : null,
+      createdAt: Date.now(),
+      question: payload.question,
+      type: payload.type,
+      highlightedText: payload.type === "STANDALONE" ? null : { text: payload.selectedText, range: payload.savedRange },
+      conversation: payload.type === "INIT_CONVERSATION" ? [] : null,
+      llm: {
+        name: payload.llm,
+        response: "",
+        mockResponse: null,
+        returnFollowupQuestions: null,
+        url: null,
+        responseAt: null,
+        followupQuestions: [],
+      },
+      sender: {
+        id: sender.tab.id,
+        title: sender.tab.title,
+        url: cleanUrl(sender.url)
+      },
+      status: "pending",
+      timeoutId: null,
+    }
+    db.createRequest(req).then(r => {
+      sendResponse(r) 
+      llm.send(r)
       db.addPage(req.sender.url)
     })
+
     return true
   }
 
@@ -52,12 +48,31 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     let llm = LLM.get(payload.name)
     if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
     let {currentRequest} = llm
-    clearTimeout(llm.timeoutId)
-    if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
-    currentRequest.llm = {...currentRequest.llm, ...payload}
-    chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: currentRequest }); 
-    db.updateRequestLLM(currentRequest.id, currentRequest.llm).then(() => llm.clear()) 
+    if(currentRequest){
+      clearTimeout(llm.timeoutId)
+      if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
+      currentRequest.llm = {...currentRequest.llm, ...payload}
+      chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: currentRequest }); 
+      db.updateRequestLLM(currentRequest.id, currentRequest.llm).then(() => llm.currentRequest = null) 
+      return
+    }
+    console.log("error can't find a request")
   }
+
+  if(type === "PING"){
+    console.log(type)
+    LLM.get(payload.name).setTimer()
+  } 
+
+  if(type === "RETRY"){
+    db.getRequestById(payload.id).then(r =>{
+      console.log(type)
+      console.log(payload)
+      console.log(LLM.get(r.llm.name))
+      LLM.get(r.llm.name).send(r, 1000*30)
+    })
+  }
+
   if(type === "LLM_INFO") sendResponse(LLM.llms.filter(llm => llm.tabId).map(llm => llm.name))
   if(type === "CLEAR_REQ") db.clearRequests().then(ok => sendResponse(ok))
   if(type === "GET_CFG") db.getCfg().then(cfg => sendResponse(cfg))

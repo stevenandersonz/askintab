@@ -11,6 +11,7 @@ function watchForResponse (id, returnFollowupQuestions){
           if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
             let response = node.textContent.trim()
             log("MUTATION: " + node.textContent)
+            chrome.runtime.sendMessage({ type: "PING", payload:{name:"grok"}});
             if (typeof response === 'string' && response.includes(`|START_REQ_${id}|`) && response.includes(`|END_REQ_${id}|`) && !response.includes("|IGNORE|")) {
               response = response.split('\n').slice(1, -1).join('\n'); 
               let fus = [];

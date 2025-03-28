@@ -13,6 +13,7 @@ function watchForResponse (returnFollowupQuestions){
           if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
             let response = node.textContent
             let watchFor = response.startsWith("ChatGPTNew") ? "ChatGPTNew chat" : "ChatGPT" + document.title 
+            chrome.runtime.sendMessage({ type: "PING", payload:{name:"chatgpt"}});
             log("MUTATION: " + node.textContent + "\n" + "WATCH FOR: " + watchFor)
             if (response.startsWith(watchFor)) {
               let mds = document.querySelectorAll(".markdown")
