@@ -2,6 +2,8 @@ import LLM from "./llm.js"
 import db from "./db.js"
 import {cleanUrl} from"./helpers.js"
 
+
+
 const DEBUG = true
 chrome.runtime.onStartup.addListener(() => LLM.loadAvailable());
 chrome.tabs.onUpdated.addListener(() => LLM.loadAvailable());
@@ -45,23 +47,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if (type === "LLM_RESPONSE") {
     let llm = LLM.get(payload.name)
     if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
-    let {currentRequest} = llm
-    if(currentRequest){
-      clearTimeout(llm.timeoutId)
-      if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
-      let fus = []
-      if(currentRequest.llm.returnFollowupQuestions) fus = [...payload.raw.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
-      currentRequest.llm.response = payload.raw.replaceAll(/<button class="askintab-followup-q">(.*?)<\/button>/g, "")
-      currentRequest.llm.response = payload.raw.replaceAll(/<div class='mermaid'>(.*?)<\/div>/gs, "```mermaid\n$1\n```");
-      currentRequest.llm.raw = payload.raw
-      currentRequest.llm.responseAt = payload.responseAt
-      currentRequest.llm.followupQuestions = fus
-      currentRequest.status = "completed"
-      chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: currentRequest }); 
-      db.updateRequestLLM(currentRequest.id, currentRequest.llm).then(() => llm.currentRequest = null) 
-      return
-    }
-    console.log("error can't find a request")
+    llm.processResponse(payload)
   }
 
   if(type === "PING"){
@@ -78,7 +64,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     })
   }
 
-  if(type === "LLM_INFO") sendResponse(LLM.llms.filter(llm => llm.tabId).map(llm => llm.name))
+  if(type === "LLM_INFO") sendResponse(LLM.llms.map(llm => llm.name))
   if(type === "CLEAR_REQ") db.clearRequests().then(ok => sendResponse(ok))
   if(type === "GET_CFG") db.getCfg().then(cfg => sendResponse(cfg))
   if(type === "PUT_CFG") db.updateCfg(payload).then(cfg => sendResponse(cfg))

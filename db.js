@@ -5,6 +5,7 @@ class DB {
       returnFollowupQuestions: true,
       prompterShortcut: "Control + k",
       chatgptCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would.",
+      openaiKey: "",
       grokCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would."
     };
     this.dbName = "askintab_db";

@@ -358,6 +358,7 @@ const askInTabExt = (() => {
   function loadResponse(responses) {
     if (!responses.length) return;
     const content = {}
+    console.log(responses)
     for (let r of responses.filter((r) => r.type==="INIT_CONVERSATION")){
       const { startContainerPath, startOffset, endContainerPath, endOffset} = r.highlightedText.range;
       const startNode = findNodeByPath(startContainerPath);

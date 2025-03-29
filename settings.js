@@ -29,6 +29,7 @@ llmCfg.addEventListener("input", async ({target}) => {
   console.log(target.id)
   await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[target.id]: target.value}})
 })
+
 let keysPressed = new Set();
 
 promptShorcutInput.addEventListener("keydown", async (event) => {
@@ -46,12 +47,12 @@ promptShorcutInput.addEventListener("keyup", () => {
 
 let cfg = await chrome.runtime.sendMessage({type: "GET_CFG"})
 promptShorcutInput.value = cfg.prompterShortcut;
-for (let el of llmCfg.querySelectorAll("input")){
+for (let el of llmCfg.querySelectorAll("input[type='checkbox']")){
   el.checked = cfg[el.id]
 }
 
-for (let el of llmCfg.querySelectorAll("textarea")){
-  el.innerText = cfg[el.id]
+for (let el of llmCfg.querySelectorAll("input:not([type='checkbox']), textarea")){
+  el.value = cfg[el.id]
 }
 
 })

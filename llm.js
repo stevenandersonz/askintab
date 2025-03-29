@@ -1,29 +1,21 @@
-import {grok, mock} from "./llms/index.js"
+import {grok, mock, openAI} from "./llms/index.js"
 import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*2
 
-const BASE = `
-Ignore the tag IGNORE<id> start your response with STARTREQ<id> end your response with ENDREQ<id> \n`
-const INLINE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
+const BASE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div \n`
 const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
   each question should be surrounded by <button class="askintab-followup-q"> </question>
   add 1 more question exactly as <button class="askintab-followup-q"> I want to ask something else </question> \n`
 
-function buildPrompt(llm, cfg){
-  const {highlightedText, question, type} = llm.currentRequest
-  let id = Math.floor(Math.random() * 1000) + 1 
-  let systemPrompt = cfg[llm.name+"Cfg"] + BASE.replaceAll("<id>", id)
-  let userPrompt = type === "INIT_CONVERSATION" ? highlightedText.text + "\n" + question : question 
-  systemPrompt+= type !== "STANDALONE" ? INLINE + (cfg.returnFollowupQuestions ? FUS : "") : ""
-  return {prompt: `${systemPrompt}\n${userPrompt}`, promptId:id, tabId: llm.tabId}
-}
+
 
 export default class LLM {
   static llms = []
-  constructor(name, domain, provider) {
+  constructor(name, domain, provider, local=false) {
     this.name = name;
+    this.local=local
     this.domain = domain;
     this.lastUsed = null;
     this.tabId = null;
@@ -42,11 +34,34 @@ export default class LLM {
     req.llm.returnFollowupQuestions = cfg.returnFollowupQuestions,
     this.currentRequest = req
     this.setTimer(timerOffset)
-    return cfg.mockResponse ? mock(this) : this.provider(buildPrompt(this, cfg));
+    if(cfg.mockResponse) return mock(this)
+    let {systemPrompt, userPrompt} = this.buildPrompt(cfg)
+    if(this.local) return this.provider({...cfg, systemPrompt, userPrompt, tabId: this.tabId})
+    let parentReq = null
+    if(req.parentReqId) parentReq = await db.getRequestById(req.parentReqId)
+    return await this.processResponse(await this.provider({...cfg, systemPrompt, userPrompt, responseId: parentReq?.llm?.responseId}))
+  }
+
+  async processResponse(payload) {
+    if(!this.currentRequest) return
+    let fus = []
+    if(this.currentRequest.llm.returnFollowupQuestions) {
+      fus = [...payload.raw.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
+    }
+    this.currentRequest.llm.response = payload.raw.replaceAll(/<button class="askintab-followup-q">(.*?)<\/button>/g, "")
+    this.currentRequest.llm.response = payload.raw.replaceAll(/<div class='mermaid'>(.*?)<\/div>/gs, "```mermaid\n$1\n```");
+    this.currentRequest.llm.responseId = payload.responseId
+    this.currentRequest.llm.raw = payload.raw
+    this.currentRequest.llm.responseAt = payload.responseAt
+    this.currentRequest.llm.followupQuestions = fus
+    this.currentRequest.status = "completed"
+    await db.updateRequestLLM(this.currentRequest.id, this.currentRequest.llm)
+    await chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest }); 
+    this.currentRequest = null
   }
 
   setTimer (timerOffset=0){
-    if(this.currentRequest)
+    if(!this.currentRequest) return
     if(this.timeoutId) clearTimeout(this.timeoutId)
     this.timeoutId = setTimeout(() => {
       console.log(`REQUEST TIMEOUT ${this.name}`);
@@ -56,6 +71,13 @@ export default class LLM {
     }, TIMEOUT_AFTER + timerOffset); 
   }
 
+  buildPrompt(cfg){
+    const {highlightedText, question, type, local} = this.currentRequest
+    let systemPrompt = BASE + (cfg.returnFollowupQuestions ? FUS : "") + cfg[this.name+"Cfg"] 
+    let userPrompt = type === "INIT_CONVERSATION" ? highlightedText.text + "\n" + question : question 
+    return {systemPrompt, userPrompt}
+  }
+
   static get(name){
     let llm = LLM.llms.find(llm => llm.name === name) 
     return llm === undefined ? null : llm
@@ -63,6 +85,7 @@ export default class LLM {
 
   static async loadAvailable (){
     for(let llm of LLM.llms){
+      if(!llm.local) continue
       const urlPattern = `*://*.${llm.domain}/*`;
       let tabs = await chrome.tabs.query({ url: urlPattern })
       if(tabs.length <= 0) continue
@@ -72,5 +95,5 @@ export default class LLM {
   }
 }
 
-new LLM('grok', 'grok.com', grok)
-// new LLM('chatgpt', 'chatgpt.com', chatgpt)
+new LLM('grok', 'grok.com', grok, true)
+new LLM('openai', 'https://api.openai.com/v1/responses', openAI, false)

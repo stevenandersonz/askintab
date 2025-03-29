@@ -92,6 +92,11 @@
             font-size: 14px;
         }
 
+        .setting-item input[type="text"].large-input {
+            width: 100%;
+            margin-top: 10px;
+        }
+
         .setting-item textarea {
             width: 100%;
             height: 100px;
@@ -163,10 +168,14 @@
                     <label for="mockResponse">Fake Response</label>
                     <input type="checkbox" id="mockResponse">
                 </div>
-                <!-- <div class="setting-item setting-with-textarea"> -->
-                    <!-- <label for="chatgptCfg">ChatGPT Prompt</label>
+                <div class="setting-item setting-with-textarea">
+                    <label for="chatgptCfg">ChatGPT Prompt</label>
                     <textarea id="chatgptCfg" placeholder="Enter ChatGPT configuration..."></textarea>
-                </div> -->
+                </div>
+                <div class="setting-item setting-with-textarea">
+                    <label for="openaiKey">OpenAI API Key</label>
+                    <input class="large-input" type="text" id="openaiKey" placeholder="Enter your OpenAI API key">
+                </div>
                 <div class="setting-item setting-with-textarea">
                     <label for="grokCfg">Grok Prompt</label>
                     <textarea id="grokCfg" placeholder="Enter Grok configuration..."></textarea>

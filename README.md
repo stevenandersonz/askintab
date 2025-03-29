@@ -3,7 +3,7 @@
  Ask In  /  Tab  \
 ------------------ 
 ```
-Connect the current page to Grok if is running in your tabs. No more copy/pasting grind—just inline answers to the questions you need.
+Connect the current page to the LLM you want to use if is running in your tabs. No more copy/pasting grind—just inline answers to the questions you need.
 
 "Ask in Tab" keeps a local record using IndexedDB of the pages where you used it, so your questions and answers will be there when you come back again (unless the page has changed since the last time; you can still export your conversations, though!).
 
@@ -19,7 +19,8 @@ No need to worry about your data since this runs locally, and don’t worry abou
 - **Settings**: Click the extension icon -> Click settings icon on the top right corner of the popup.
 
 ## Supported LLMs
-- Grok (xAI)
+- Grok (xAI) 
+- OpenAI (gpt-4o)
 
 ## Install
 1. Clone this repo: git clone https://github.com/stevenandersonz/askintab.git
