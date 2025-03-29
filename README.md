@@ -3,11 +3,18 @@
  Ask In  /  Tab  \
 ------------------ 
 ```
-Connect the current page to the LLM you want to use if is running in your tabs. No more copy/pasting grind—just inline answers to the questions you need.
+Connect the current page a LLM. No more copy/pasting grind—just inline answers to the questions you need.
 
 "Ask in Tab" keeps a local record using IndexedDB of the pages where you used it, so your questions and answers will be there when you come back again (unless the page has changed since the last time; you can still export your conversations, though!).
 
 No need to worry about your data since this runs locally, and don’t worry about paying an extra subscription—just download it and use it with the LLMs you’re already paying for.
+
+## Install
+1. Clone this repo: git clone https://github.com/stevenandersonz/askintab.git
+2. Go to `chrome://extensions/` or `about:addons`.
+3. Turn on "Developer Mode".
+4. Click "Load unpacked" and pick the folder.
+5. set the API_KEY of the LLM in the settings unless if local like Grok
 
 ## Use
 - **Text**: To ask a question, highlight text, then press `CTRL+K`, ask and send. A spinner will show up next to the text a let you know when the response is completed.
@@ -21,12 +28,6 @@ No need to worry about your data since this runs locally, and don’t worry abou
 ## Supported LLMs
 - Grok (xAI) 
 - OpenAI (gpt-4o)
-
-## Install
-1. Clone this repo: git clone https://github.com/stevenandersonz/askintab.git
-2. Go to `chrome://extensions/` or `about:addons`.
-3. Turn on "Developer Mode".
-4. Click "Load unpacked" and pick the folder.
 
 ## Extension Permisions
   - Tabs: To find the tab id where the llm is
