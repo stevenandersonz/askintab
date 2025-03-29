@@ -2,27 +2,21 @@ import {grok, chatgpt, mock} from "./llms/index.js"
 import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*2
-const PRE_PROMPTS = {
-  INIT_CONVERSATION: (id, {returnFollowupQuestions}) => {
-    let base = `
-    Ignore the tag IGNORE${id} start your response with STARTREQ${id} end your response with ENDREQ${id}
-    if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
-    for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div
-    
-    `
-    let fus = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
-     each question should be surrounded by <button class="askintab-followup-q"> </question>
-     add 1 more question as <button class="askintab-followup-q"> Ask myself </question> 
-     `
-    return returnFollowupQuestions ? base + fus : base
-  },
-  STANDALONE: () =>  "respond only with what you were asked"
-} 
+
+const BASE = `
+Ignore the tag IGNORE<id> start your response with STARTREQ<id> end your response with ENDREQ<id> \n`
+const INLINE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
+for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div \n`
+const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
+  each question should be surrounded by <button class="askintab-followup-q"> </question>
+  add 1 more question as <button class="askintab-followup-q"> Ask myself </question> \n`
+
 function buildPrompt(llm, cfg){
-  const {highlightedText, question} = llm.currentRequest
+  const {highlightedText, question, type} = llm.currentRequest
   let userPrompt = (highlightedText ? highlightedText.text + "\n" : "") + question 
   let id = Math.floor(Math.random() * 1000) + 1 
-  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type === "STANDALONE" ? "STANDALONE" : "INIT_CONVERSATION" ](id, cfg)
+  let systemPrompt = cfg[llm.name+"Cfg"] + BASE.replaceAll("<id>", id)
+  systemPrompt+= type !== "STANDALONE" ? INLINE + (cfg.returnFollowupQuestions ? FUS : "") : ""
   return {prompt: `${systemPrompt}\n${userPrompt}`, promptId:id, tabId: llm.tabId}
 }
 
@@ -61,11 +55,6 @@ export default class LLM {
     }, TIMEOUT_AFTER + timerOffset); 
   }
 
-  async getURL() {
-    let tab = await chrome.tabs.get(this.tabId);
-    return tab.url;
-  }
-
   static get(name){
     let llm = LLM.llms.find(llm => llm.name === name) 
     return llm === undefined ? null : llm
@@ -83,4 +72,4 @@ export default class LLM {
 }
 
 new LLM('grok', 'grok.com', grok)
-new LLM('chatgpt', 'chatgpt.com', chatgpt)
+// new LLM('chatgpt', 'chatgpt.com', chatgpt)

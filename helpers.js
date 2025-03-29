@@ -45,7 +45,7 @@ export function watchForResponse (id, name){
               let responses = document.querySelectorAll(".prose")
               let response = responses[responses.length-1]
               response = response.textContent.split('\n').slice(1, -1).join('\n'); 
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{response, name}});
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{response, name, responseAt: new Date()}});
               observer.disconnect()
             }
          }

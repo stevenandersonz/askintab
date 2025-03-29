@@ -20,7 +20,6 @@ No need to worry about your data since this runs locally, and don’t worry abou
 
 ## Supported LLMs
 - Grok (xAI)
-- ChatGPT (OpenAI)
 
 ## Install
 1. Clone this repo: git clone https://github.com/stevenandersonz/askintab.git

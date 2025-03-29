@@ -23,7 +23,6 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         response: "",
         mockResponse: null,
         returnFollowupQuestions: null,
-        url: null,
         responseAt: null,
         followupQuestions: [],
       },
@@ -54,6 +53,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       let fus = []
       if(currentRequest.llm.returnFollowupQuestions) fus = [...payload.response.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
       currentRequest.llm.response = payload.response
+      currentRequest.llm.responseAt = payload.responseAt
       currentRequest.llm.followupQuestions = fus
       currentRequest.status = "completed"
       chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: currentRequest }); 
@@ -64,8 +64,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   }
 
   if(type === "PING"){
-    console.log(type)
-    LLM.get(payload.name).setTimer()
+    let llm = LLM.get(payload.name)
+    if(llm.currentRequest)llm.setTimer()
   } 
 
   if(type === "RETRY"){

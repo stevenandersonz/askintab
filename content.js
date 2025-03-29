@@ -515,6 +515,7 @@ const askInTabExt = (() => {
           let mdCnt = req.querySelector("."+getClassName("md-content"))
           mdCnt.lastChild.remove()
           mdCnt.innerHTML += `<h3 id=${getClassName("q-"+req.id)}>${question}</h3> ${marked.parse(llm.response)}`
+          mermaid.run({ querySelector: ".mermaid" });
         }
       }
       // Send data to popup when requested
