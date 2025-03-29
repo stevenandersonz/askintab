@@ -51,7 +51,11 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if(currentRequest){
       clearTimeout(llm.timeoutId)
       if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
-      currentRequest.llm = {...currentRequest.llm, ...payload}
+      let fus = []
+      if(currentRequest.llm.returnFollowupQuestions) fus = [...payload.response.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
+      currentRequest.llm.response = payload.response
+      currentRequest.llm.followupQuestions = fus
+      currentRequest.status = "completed"
       chrome.tabs.sendMessage(llm.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: currentRequest }); 
       db.updateRequestLLM(currentRequest.id, currentRequest.llm).then(() => llm.currentRequest = null) 
       return

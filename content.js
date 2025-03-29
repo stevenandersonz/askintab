@@ -179,21 +179,21 @@ const askInTabExt = (() => {
   mdCnt.classList.add(getClassName("md-content"))
   mdCnt.setAttribute('style',"background-color: transparent; padding: 0; margin: 0;")
 
-
-  const followUpsCnt = document.createElement("div"); 
-  followUpsCnt.classList.add(getClassName("followups-cnt"))
-
   const responseCnt = document.createElement("div");
   responseCnt.className = getClassName(['response-cnt', "hidden", getColorMode()])
   responseCnt.appendChild(mdCnt)
-  responseCnt.appendChild(followUpsCnt)
 
 
   //---
   //UTILS
   //---
   // content.js
- 
+  function scrollToQ(){
+    if(!(window.location.hash && window.location.hash.startsWith("#askintab-q"))) return
+    let q = document.querySelector(window.location.hash)
+    q.parentElement.parentElement.classList.remove(getClassName("hidden"))
+    q.scrollIntoView({behavior: 'smooth'})
+  }
 
   function setPasteEvent(text){
     let pasteEvent = new ClipboardEvent("paste", {
@@ -224,17 +224,6 @@ const askInTabExt = (() => {
     if(typeof className === 'string') return EXT_NAME + '-' + className
   }
 
-  function renderMarkdown(payload){
-    const renderer = new marked.Renderer();
-    renderer.code = (tokens) => {
-      if (tokens.lang === "mermaid") {
-        return `<div class="mermaid">${tokens.text}</div>`;
-      }
-      return `<pre><code class="${tokens.lang}">${tokens.raw}</code></pre>`;
-    };
-    return marked.parse(payload, {renderer})
-  }
-  
   function getColorMode (){
     const bgColor = getComputedStyle(document.body).backgroundColor; 
     const rgb = bgColor.match(/\d+/g).map(Number); 
@@ -282,7 +271,6 @@ const askInTabExt = (() => {
   // DOM MANIPULATION
   //---  
 
-
   function createHighlight(selection, id="pending"){
     let range = selection.getRangeAt(0)
     clonedHighlight = highlight.cloneNode()
@@ -315,25 +303,16 @@ const askInTabExt = (() => {
   
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
-    newResponseCnt.children[0].innerHTML = renderMarkdown(`### ${req.question} \n ${req.llm.response}`) 
-    newResponseCnt.children[0].id = getClassName("md-"+req.id)
+    newResponseCnt.children[0].innerHTML =`<h3 id=${getClassName("q-"+req.id)}>${req.question}</h3> ${marked.parse(req.llm.response)}`
 
-    for(let fu of [...req.llm.followupQuestions, "I want to ask something else"]){
-      let btn = document.createElement("button")
-      btn.className = getClassName("followup-btn") 
-      btn.innerText = fu
-      newResponseCnt.children[1].appendChild(btn)
-    }
     newResponseCnt.addEventListener("click", async (evt) => {
-      if (evt.target.className === getClassName("followup-btn")){
+      console.log(evt.target)
+      if (evt.target.className === getClassName("followup-q")){
         let parentId = newResponseCnt.parentElement.id.split('-').pop()
-        let clone = mdCnt.cloneNode(false)
-        newResponseCnt.lastChild.before(clone)
         positionPopover(evt.target)
         openPopover("FOLLOWUP", Number(parentId))
         if(evt.target.textContent.toUpperCase() !== "I want to ask something else".toUpperCase()){
           textarea.value = evt.target.textContent 
-
         }
         return
       }
@@ -378,42 +357,32 @@ const askInTabExt = (() => {
   
   function loadResponse(responses) {
     if (!responses.length) return;
-    console.log(responses)
-    for (let r of responses){
-      if(r.type === "INIT_CONVERSATION"){
-        const { startContainerPath, startOffset, endContainerPath, endOffset} = r.highlightedText.range;
-        const startNode = findNodeByPath(startContainerPath);
-        const endNode = findNodeByPath(endContainerPath);
-        const range = document.createRange();
-        range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
-        range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
-        
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        let highlight = createHighlight(selection, r.id)
-        let link = createLink(r.id)
-        highlight.appendChild(link);
-        highlight.classList.remove(getClassName("selection"))
-        highlight.appendChild(link)
-        link.innerHTML = `[${document.querySelectorAll("."+ rLink.className).length}]`
-        let newResponseCnt = createResponseCnt(r)
-        highlight.appendChild(newResponseCnt)
-      }
-      if(r.type === "FOLLOWUP"){
-        let resCnt = document.querySelector("#" + getClassName("request-" + r.parentReqId)+" ."+getClassName("response-cnt")) 
-        console.log(resCnt)
-        let newMdCnt = mdCnt.cloneNode(false) 
-        newMdCnt.innerHTML = renderMarkdown(`### ${r.question} \n ${r.llm.response}`)
-        newMdCnt.id = r.id 
-        resCnt.lastChild.before(newMdCnt)
-        fuCnt = newMdCnt.nextElementSibling
-        for (let i = 0; i < r.llm.followupQuestions.length; i++){
-          fuCnt.children[i].innerText = r.llm.followupQuestions[i]
-        }
-      }
+    const content = {}
+    for (let r of responses.filter((r) => r.type==="INIT_CONVERSATION")){
+      const { startContainerPath, startOffset, endContainerPath, endOffset} = r.highlightedText.range;
+      const startNode = findNodeByPath(startContainerPath);
+      const endNode = findNodeByPath(endContainerPath);
+      const range = document.createRange();
+      range.setStart(startNode, Math.min(startOffset, startNode.length || 0));
+      range.setEnd(endNode, Math.min(endOffset, endNode.length || 0));
+      
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      let highlight = createHighlight(selection, r.id)
+      let link = createLink(r.id)
+      highlight.appendChild(link);
+      highlight.classList.remove(getClassName("selection"))
+      highlight.appendChild(link)
+      link.innerHTML = `[${document.querySelectorAll("."+ rLink.className).length}]`
+      let newResponseCnt = createResponseCnt(r)
+      content[r.id] = newResponseCnt.querySelector("."+getClassName("md-content"))
+      highlight.appendChild(newResponseCnt)
     }
-    
+    for (let r of responses.filter((r) => r.type==="FOLLOWUP")){
+      content[r.parentReqId].querySelectorAll("."+getClassName("followup-q")).forEach(e => e.remove())
+      content[r.parentReqId].innerHTML += `<h3 id=${getClassName("q-"+r.id)}>${r.question}</h3> ${marked.parse(r.llm.response)}`
+    }
   }
 
   // Initialization
@@ -426,21 +395,13 @@ const askInTabExt = (() => {
 
   function setupEventListeners(){
 
-    window.addEventListener('hashchange', () => {
-      let mdCnt = document.querySelector(window.location.hash)
-      mdCnt.parentElement.classList.remove(getClassName("hidden"))
-      mdCnt.scrollIntoView({behavior: 'smooth'})
-    })
+    window.addEventListener('hashchange', scrollToQ) 
 
     window.addEventListener('load', async () => {
       let res = await chrome.runtime.sendMessage({ type: "GET_BY_URL", payload: document.URL })
-      if(res.length > 0) loadResponse(res)
-      if(window.location.hash){
-        let mdCnt = document.querySelector(window.location.hash)
-        if(!mdCnt)return
-        mdCnt.parentElement.classList.remove(getClassName("hidden"))
-        mdCnt.scrollIntoView({behavior: 'smooth'})
-      }
+      if(res.length <= 0) return
+      loadResponse(res)
+      scrollToQ()
     });
     
     popoverCloseBtn.addEventListener('click', (e) => {
@@ -511,11 +472,9 @@ const askInTabExt = (() => {
       } 
       if(type === "INIT_CONVERSATION") payload = {question, selectedText: highlight.textContent, llm, savedRange, type}
       if(type === "FOLLOWUP"){
-        let rCnt = document.querySelector(`#${getClassName('request')}-${parentReqId}`).lastChild 
-        let fuCnt = rCnt.lastChild
-        fuCnt.classList.add(getClassName("hidden"))
-        fuCnt.previousElementSibling.innerHTML = spinner
-        fuCnt.previousElementSibling.classList.add(getClassName("loading"))
+        let md = document.querySelector(`#${getClassName('request')}-${parentReqId} .${getClassName('md-content')}`);
+        md.querySelectorAll("."+getClassName("followup-q")).forEach(e => e.remove())
+        md.innerHTML += `<h3>${question} ${spinner} </h3>`
         payload = {question, llm, type, parentReqId}
       }
 
@@ -553,16 +512,9 @@ const askInTabExt = (() => {
 
         if(type === "FOLLOWUP" ){
           let req = document.querySelector("#" + getClassName("request-" + parentReqId)) 
-          let mdCnt = req.querySelector("."+getClassName("loading"))
-          mdCnt.classList.remove(getClassName('loading'));
-          mdCnt.id=getClassName("md-"+id)
-          mdCnt.innerHTML = renderMarkdown(renderMarkdown(`### ${question} \n ${llm.response}`))
-          fuCnt = mdCnt.nextElementSibling
-          fuCnt.classList.remove(getClassName("hidden"))
-          for (let i = 0; i < llm.followupQuestions.length; i++){
-            fuCnt.children[i].innerText = llm.followupQuestions[i]
-          }
-          return
+          let mdCnt = req.querySelector("."+getClassName("md-content"))
+          mdCnt.lastChild.remove()
+          mdCnt.innerHTML += `<h3 id=${getClassName("q-"+req.id)}>${question}</h3> ${marked.parse(llm.response)}`
         }
       }
       // Send data to popup when requested

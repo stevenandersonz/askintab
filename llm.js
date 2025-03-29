@@ -1,11 +1,19 @@
 import {grok, chatgpt, mock} from "./llms/index.js"
 import db from "./db.js"
 
-const TIMEOUT_AFTER = 1000*60
+const TIMEOUT_AFTER = 1000*60*2
 const PRE_PROMPTS = {
-  INIT_CONVERSATION: ({returnFollowupQuestions}) => {
-    let base = "if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>, for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div"
-    let fus = " Add 3 follow up question to expand on your response. each followup question should be surrounded by <question> </question>, Rembember to phrase the follow-up questions as further prompts to yourself"
+  INIT_CONVERSATION: (id, {returnFollowupQuestions}) => {
+    let base = `
+    Ignore the tag IGNORE${id} start your response with STARTREQ${id} end your response with ENDREQ${id}
+    if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
+    for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div
+    
+    `
+    let fus = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
+     each question should be surrounded by <button class="askintab-followup-q"> </question>
+     add 1 more question as <button class="askintab-followup-q"> Ask myself </question> 
+     `
     return returnFollowupQuestions ? base + fus : base
   },
   FOLLOWUP: () => "Rembember to phrase the follow-up questions as further prompts to yourself",
@@ -14,8 +22,9 @@ const PRE_PROMPTS = {
 function buildPrompt(llm, cfg){
   const {highlightedText, question} = llm.currentRequest
   let userPrompt = (highlightedText ? highlightedText.text + "\n" : "") + question 
-  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type](cfg)
-  return function getProviderPrompt (pPrompt) { return `${pPrompt}\n${systemPrompt}\n${userPrompt}` } 
+  let id = Math.floor(Math.random() * 1000) + 1 
+  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type](id, cfg)
+  return {prompt: `${systemPrompt}\n${userPrompt}`, promptId:id, tabId: llm.tabId}
 }
 
 export default class LLM {
@@ -40,10 +49,10 @@ export default class LLM {
     req.llm.returnFollowupQuestions = cfg.returnFollowupQuestions,
     this.currentRequest = req
     this.setTimer(timerOffset)
-    return cfg.mockResponse ? mock(this) : this.provider(this, buildPrompt(this, cfg));
+    return cfg.mockResponse ? mock(this) : this.provider(buildPrompt(this, cfg));
   }
 
-  setTimer (timerOffset){
+  setTimer (timerOffset=0){
     if(this.timeoutId) clearTimeout(this.timeoutId)
     this.timeoutId = setTimeout(() => {
       console.log(`REQUEST TIMEOUT ${this.name}`);

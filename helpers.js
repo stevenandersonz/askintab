@@ -30,3 +30,30 @@ export function submitPrompt(selector) {
     btnSend.click();
   } 
 }
+
+export function watchForResponse (id, name){
+  let log = (msg) => chrome.runtime.sendMessage({type: "DEBUG", payload: msg})
+  const observer = new MutationObserver(function(mutationsList) {
+    for (const mutation of mutationsList) {
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
+            let text = node.textContent.trim()
+            log("MUTATION: " + node.textContent)
+            chrome.runtime.sendMessage({ type: "PING", payload:{name}});
+            text = text.split('\n')
+            console.log(text)
+            if(text.length >= 2 && text[0].includes("STARTREQ"+id) && !text[0].includes("IGNORE"+id) && text[text.length-1].includes("ENDREQ"+id)){
+              let responses = document.querySelectorAll(".prose")
+              let response = responses[responses.length-1]
+              response = response.textContent.split('\n').slice(1, -1).join('\n'); 
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{response, name}});
+              observer.disconnect()
+            }
+         }
+        });
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true});
+}

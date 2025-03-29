@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   conversations.addEventListener("change", async function(evt){
     const reqs = await chrome.runtime.sendMessage({type: "GET_BY_URL", payload: evt.target.value})
-    const questions = reqs.map(r => ({text: r.question, id: "companion-md-" + r.id }));
+    const questions = reqs.map(r => ({text: r.question, id: "askintab-q-" + r.id }));
     const questionCount = questions.length
     if(questionCount > 0){
       document.getElementById('question-count').textContent = questionCount;
