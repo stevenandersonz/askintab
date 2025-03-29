@@ -16,14 +16,13 @@ const PRE_PROMPTS = {
      `
     return returnFollowupQuestions ? base + fus : base
   },
-  FOLLOWUP: () => "Rembember to phrase the follow-up questions as further prompts to yourself",
   STANDALONE: () =>  "respond only with what you were asked"
 } 
 function buildPrompt(llm, cfg){
   const {highlightedText, question} = llm.currentRequest
   let userPrompt = (highlightedText ? highlightedText.text + "\n" : "") + question 
   let id = Math.floor(Math.random() * 1000) + 1 
-  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type](id, cfg)
+  let systemPrompt = cfg[llm.name+"Cfg"] + PRE_PROMPTS[llm.currentRequest.type === "STANDALONE" ? "STANDALONE" : "INIT_CONVERSATION" ](id, cfg)
   return {prompt: `${systemPrompt}\n${userPrompt}`, promptId:id, tabId: llm.tabId}
 }
 
