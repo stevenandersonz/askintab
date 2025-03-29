@@ -1,4 +1,4 @@
-import {grok, chatgpt, mock} from "./llms/index.js"
+import {grok, mock} from "./llms/index.js"
 import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*2
@@ -13,9 +13,9 @@ const FUS = `Add 3 follow up question to expand on your response, and phrase the
 
 function buildPrompt(llm, cfg){
   const {highlightedText, question, type} = llm.currentRequest
-  let userPrompt = (highlightedText ? highlightedText.text + "\n" : "") + question 
   let id = Math.floor(Math.random() * 1000) + 1 
   let systemPrompt = cfg[llm.name+"Cfg"] + BASE.replaceAll("<id>", id)
+  let userPrompt = type === "INIT_CONVERSATION" ? highlightedText.text + "\n" + question : question 
   systemPrompt+= type !== "STANDALONE" ? INLINE + (cfg.returnFollowupQuestions ? FUS : "") : ""
   return {prompt: `${systemPrompt}\n${userPrompt}`, promptId:id, tabId: llm.tabId}
 }

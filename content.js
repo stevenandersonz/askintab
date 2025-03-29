@@ -303,7 +303,7 @@ const askInTabExt = (() => {
   
   function createResponseCnt(req){
     let newResponseCnt = responseCnt.cloneNode(true);
-    newResponseCnt.children[0].innerHTML =`<h3 id=${getClassName("q-"+req.id)}>${req.question}</h3> ${marked.parse(req.llm.response)}`
+    newResponseCnt.children[0].innerHTML =`<h3 id=${getClassName("q-"+req.id)}>${req.question}</h3> ${marked.parse(req.llm.raw)}`
 
     newResponseCnt.addEventListener("click", async (evt) => {
       console.log(evt.target)
@@ -381,7 +381,7 @@ const askInTabExt = (() => {
     }
     for (let r of responses.filter((r) => r.type==="FOLLOWUP")){
       content[r.parentReqId].querySelectorAll("."+getClassName("followup-q")).forEach(e => e.remove())
-      content[r.parentReqId].innerHTML += `<h3 id=${getClassName("q-"+r.id)}>${r.question}</h3> ${marked.parse(r.llm.response)}`
+      content[r.parentReqId].innerHTML += `<h3 id=${getClassName("q-"+r.id)}>${r.question}</h3> ${marked.parse(r.llm.raw)}`
     }
   }
 
@@ -514,7 +514,7 @@ const askInTabExt = (() => {
           let req = document.querySelector("#" + getClassName("request-" + parentReqId)) 
           let mdCnt = req.querySelector("."+getClassName("md-content"))
           mdCnt.lastChild.remove()
-          mdCnt.innerHTML += `<h3 id=${getClassName("q-"+req.id)}>${question}</h3> ${marked.parse(llm.response)}`
+          mdCnt.innerHTML += `<h3 id=${getClassName("q-"+req.id)}>${question}</h3> ${marked.parse(llm.raw)}`
           mermaid.run({ querySelector: ".mermaid" });
         }
       }

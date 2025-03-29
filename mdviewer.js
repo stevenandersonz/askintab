@@ -19,7 +19,6 @@ const exportConversations = (reqArray) => {
     let text = `
       origin: ${init.sender.url}
       llm: ${init.llm.name}
-      url: ${init.llm.url}
       highlighted: ${init.highlightedText?.text || ""}
       ---
       ### ${init.question} 

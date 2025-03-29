@@ -12,12 +12,12 @@
   width: 100%;
   border: none;
   padding: 10px;
-  cursor: pointer;
+  cursor: pointer !important;
   border-top: solid 1px #555;
   background: transparent;
 }
 
-.askintab-followup-btn:last-child {
+.askintab-followup-q:last-child {
   border-bottom: solid 1px #555;
 }
 
@@ -32,11 +32,11 @@
   color: #ffffff;
 }
 
-.askintab-dark .askintab-followup-btn:hover {
+.askintab-dark .askintab-followup-q:hover {
   background-color: rgba(0, 0, 0, 0.1);
 }
 
-.askintab-light .askintab-followup-btn:hover {
+.askintab-light .askintab-followup-q:hover {
   background-color: rgba(168, 168, 168, 0.1);
 }
 

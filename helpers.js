@@ -43,9 +43,9 @@ export function watchForResponse (id, name){
             chrome.runtime.sendMessage({ type: "PING", payload:{name}});
             if(typeof text === "string" && text.includes("STARTREQ"+id) && !text.includes("IGNORE"+id) && text.includes("ENDREQ"+id)){
               let responses = document.querySelectorAll(".prose")
-              let response = responses[responses.length-1]
-              response = response.textContent.split('\n').slice(1, -1).join('\n'); 
-              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{response, name, responseAt: new Date()}});
+              let raw = responses[responses.length-1]
+              raw = raw.textContent.split('\n').slice(1, -1).join('\n'); 
+              chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw, name, responseAt: new Date()}});
               observer.disconnect()
             }
          }

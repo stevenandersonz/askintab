@@ -17,7 +17,6 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       question: payload.question,
       type: payload.type,
       highlightedText: payload.type === "STANDALONE" ? null : { text: payload.selectedText, range: payload.savedRange },
-      conversation: payload.type === "INIT_CONVERSATION" ? [] : null,
       llm: {
         name: payload.llm,
         response: "",
@@ -51,8 +50,10 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       clearTimeout(llm.timeoutId)
       if(DEBUG) console.log(`${payload.name.toUpperCase()} - REQUEST COMPLETED`)
       let fus = []
-      if(currentRequest.llm.returnFollowupQuestions) fus = [...payload.response.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
-      currentRequest.llm.response = payload.response
+      if(currentRequest.llm.returnFollowupQuestions) fus = [...payload.raw.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
+      currentRequest.llm.response = payload.raw.replaceAll(/<button class="askintab-followup-q">(.*?)<\/button>/g, "")
+      currentRequest.llm.response = payload.raw.replaceAll(/<div class='mermaid'>(.*?)<\/div>/gs, "```mermaid\n$1\n```");
+      currentRequest.llm.raw = payload.raw
       currentRequest.llm.responseAt = payload.responseAt
       currentRequest.llm.followupQuestions = fus
       currentRequest.status = "completed"
