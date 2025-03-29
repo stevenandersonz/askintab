@@ -36,7 +36,7 @@ export function watchForResponse (id, name){
   const observer = new MutationObserver(function(mutationsList) {
     for (const mutation of mutationsList) {
       if (mutation.type === 'childList') {
-        mutation.addedNodes.forEach(node => {
+        for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE) {
             let text = node.textContent.trim()
             log("MUTATION: " + node.textContent)
@@ -47,9 +47,10 @@ export function watchForResponse (id, name){
               raw = raw.textContent.split('\n').slice(1, -1).join('\n'); 
               chrome.runtime.sendMessage({ type: "LLM_RESPONSE", payload:{raw, name, responseAt: new Date()}});
               observer.disconnect()
+              break
             }
-         }
-        });
+          }
+        };
       }
     }
   });

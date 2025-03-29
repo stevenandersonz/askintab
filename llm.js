@@ -9,7 +9,7 @@ const INLINE = `if prompted for diagrams default to mermaid.js and return the gr
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div \n`
 const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
   each question should be surrounded by <button class="askintab-followup-q"> </question>
-  add 1 more question as <button class="askintab-followup-q"> Ask myself </question> \n`
+  add 1 more question exactly as <button class="askintab-followup-q"> I want to ask something else </question> \n`
 
 function buildPrompt(llm, cfg){
   const {highlightedText, question, type} = llm.currentRequest
@@ -46,6 +46,7 @@ export default class LLM {
   }
 
   setTimer (timerOffset=0){
+    if(this.currentRequest)
     if(this.timeoutId) clearTimeout(this.timeoutId)
     this.timeoutId = setTimeout(() => {
       console.log(`REQUEST TIMEOUT ${this.name}`);
