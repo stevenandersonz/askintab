@@ -22,8 +22,8 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"], 
-      "css": ["styles.css"],
-      "js": ["libs/mermaid.min.js","libs/marked.min.js","content.js"],
+      "css": [],
+      "js": ["libs/mermaid.min.js","libs/marked.min.js","content_new.js"],
       "run_at": "document_end"
     }
   ]

@@ -3,13 +3,11 @@ import db from "./db.js"
 
 const TIMEOUT_AFTER = 1000*60*2
 
-const BASE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside <div class='mermaid'> </div>,
+const BASE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div \n`
 const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
-  each question should be surrounded by <button class="askintab-followup-q"> </question>
-  add 1 more question exactly as <button class="askintab-followup-q"> I want to ask something else </question> \n`
-
-
+  each question should be surrounded by <q> </q>
+  add 1 more question exactly as <q> I want to ask something else </q> \n`
 
 export default class LLM {
   static llms = []
@@ -44,16 +42,10 @@ export default class LLM {
 
   async processResponse(payload) {
     if(!this.currentRequest) return
-    let fus = []
-    if(this.currentRequest.llm.returnFollowupQuestions) {
-      fus = [...payload.raw.matchAll(/<button class="askintab-followup-q">(.*?)<\/button>/g)].map(match => match[1]);
-    }
-    this.currentRequest.llm.response = payload.raw.replaceAll(/<button class="askintab-followup-q">(.*?)<\/button>/g, "")
-    this.currentRequest.llm.response = payload.raw.replaceAll(/<div class='mermaid'>(.*?)<\/div>/gs, "```mermaid\n$1\n```");
     this.currentRequest.llm.responseId = payload.responseId
+    this.currentRequest.llm.response = payload.raw.replaceAll(/<q>(.*?)<\/q>/gs, "<button class='askintab-followup-q'>\n$1\n</button>```");
     this.currentRequest.llm.raw = payload.raw
     this.currentRequest.llm.responseAt = payload.responseAt
-    this.currentRequest.llm.followupQuestions = fus
     this.currentRequest.status = "completed"
     await db.updateRequestLLM(this.currentRequest.id, this.currentRequest.llm)
     await chrome.tabs.sendMessage(this.currentRequest.sender.id, { type: "LLM_RESPONSE", payload: this.currentRequest }); 
