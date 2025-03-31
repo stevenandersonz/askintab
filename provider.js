@@ -1,11 +1,11 @@
 import {mock, openAI} from "./llms/index.js"
 import db from "./db.js"
 
-const BASE = `if prompted for diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
-for your graphs do not use parenthesis for text labels, and make sure the syntax is correct. do no append any styles to the div \n`
+const BASE = `if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
+for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.`
 const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
   each question should be surrounded by <q> </q>
-  add 1 more question exactly as <q> I want to ask something else </q> \n`
+`
 
 export default class Provider {
   static all = []
@@ -26,13 +26,27 @@ export default class Provider {
     let cfg = await db.getCfg() 
     this.mockResponse = cfg.mockResponse
     this.returnFollowupQuestions = cfg.returnFollowupQuestions
+    let tabContext ="" 
+    if (r.badges && r.badges.length > 0) {
+      for (const badge of r.badges) {
+        if (badge.type === "tab" && badge.tabId) {
+          let ret = await chrome.scripting.executeScript({
+            target: {tabId: parseInt(badge.tabId)},
+            args: [],
+            func: () => document.body.innerText
+          })
+          tabContext += `\n -- text content of ${badge.tabUrl} -- \n` + ret[0].result
+        }
+      }
+    } 
+    console.log("tabContext")
+    console.log(tabContext)
     this.currentRequest = r
     if(this.mockResponse) return this.processResponse(mock(this))
-
-    let {systemPrompt, userPrompt} = this.buildPrompt(cfg)
-    let parentReq = null
-    if(req.parentReqId) parentReq = await db.getRequestById(req.parentReqId)
-    return await this.processResponse(await this.backend({...cfg, systemPrompt, userPrompt, responseId: parentReq?.llm?.responseId}))
+    let systemPrompt = BASE + (cfg.returnFollowupQuestions ? FUS : "") + cfg[this.name+"Cfg"] + tabContext
+    let userPrompt = this.currentRequest.input + "\n" + r.badges.filter(b => b.type !== "tab").map(b => b.text).join("\n")
+    let res = await this.backend({...cfg, systemPrompt, userPrompt, ...this.currentRequest.provider})
+    return await this.processResponse(res)
   }
 
   async processResponse(payload) {
@@ -43,17 +57,9 @@ export default class Provider {
     this.currentRequest.provider.raw = payload.raw
     this.currentRequest.provider.responseAt = payload.responseAt
     this.currentRequest.status = "completed"
-    //this.currentRequest.llm.response = payload.raw.replaceAll(/<q>(.*?)<\/q>/gs, "<button class='askintab-followup-q'>\n$1\n</button>```");
     await db.updateRequestLLM(this.currentRequest.id, this.currentRequest.provider)
     await chrome.tabs.sendMessage(this.currentRequest.sender.id, { action: "RESPONSE", payload: this.currentRequest.provider }); 
     this.currentRequest = null
-  }
-
-  buildPrompt(cfg){
-    const {highlightedText, question, type, local} = this.currentRequest
-    let systemPrompt = BASE + (cfg.returnFollowupQuestions ? FUS : "") + cfg[this.name+"Cfg"] 
-    let userPrompt = type === "INIT_CONVERSATION" ? highlightedText.text + "\n" + question : question 
-    return {systemPrompt, userPrompt}
   }
 
   static getModels = () => Provider.all.map(p => p.models).flat() 

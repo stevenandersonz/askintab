@@ -13,15 +13,16 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if (!provider) sendResponse({ error: `provider of model ${payload.model} is not available` });
     const req = {
       createdAt: Date.now(),
-      question: payload.question,
-      highlight:{ text: payload.selectedText, range: payload.savedRange },
+      input: payload.input,
+      badges: payload.badges || [],
       provider: {
+        lastMessageId: payload.lastMessageId,
         model: payload.model,
       },
       sender: {
         id: sender.tab.id,
         title: sender.tab.title,
-        url: cleanUrl(sender.url)
+        url: cleanUrl(sender.tab.url)
       },
       status: "pending",
     }
@@ -36,26 +37,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     return true
   }
 
-  // if (type === "LLM_RESPONSE") {
-  //   let llm = LLM.get(payload.name)
-  //   if (!llm) sendResponse({ error: `LLM ${llm} is not available` });
-  //   llm.processResponse(payload)
-  // }
-
-  // if(type === "PING"){
-  //   let llm = LLM.get(payload.name)
-  //   if(llm.currentRequest)llm.setTimer()
-  // } 
-
-  // if(type === "RETRY"){
-  //   db.getRequestById(payload.id).then(r =>{
-  //     console.log(type)
-  //     console.log(payload)
-  //     console.log(LLM.get(r.llm.name))
-  //     LLM.get(r.llm.name).send(r, 1000*30)
-  //   })
-  // }
-
+  if(action === "GET_TABS") chrome.tabs.query({}, function(tabs) { sendResponse(tabs) });
   if(action === "GET_MODELS") sendResponse(Provider.getModels())
   if(type === "CLEAR_REQ") db.clearRequests().then(ok => sendResponse(ok))
   if(type === "GET_CFG") db.getCfg().then(cfg => sendResponse(cfg))

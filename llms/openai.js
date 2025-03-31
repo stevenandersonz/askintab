@@ -1,11 +1,11 @@
 
 export async function openAI(provider){
-  const {userPrompt, systemPrompt, openaiKey, responseId} = provider
+  const {userPrompt, systemPrompt, openaiKey, lastMessageId, model} = provider
   console.log(provider)
   let body = JSON.stringify({
-    model: 'gpt-4o',
+    model: model,
     instructions: systemPrompt,
-    previous_response_id: responseId ? responseId : null,
+    previous_response_id: lastMessageId ? lastMessageId : null,
     input: userPrompt,
   })
   console.log(body)
