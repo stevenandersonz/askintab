@@ -1063,7 +1063,7 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       renderAssistantMessage(messageEl, messageData) {
-          const rawText = messageData.raw || '';
+          const rawText = messageData.message.text || '';
           const questionRegex = /<q>(.*?)<\/q>/gs; // Regex to find <q> tags
           const questions = [];
           let cleanedText = rawText.replace(questionRegex, (match, questionContent) => {
@@ -1275,7 +1275,7 @@ if (!window.hasInitializedAskInTabSideChat) {
           // No need to check sender ID usually, background script is trusted source
           // if (sender.id !== chrome.runtime.id) return false;
 
-          if (msg.action === "RESPONSE") {
+          if (msg.action === "NEW_MESSAGE") {
             this.handleResponse(msg.payload);
             // No need to return true/false unless sending an async response *from here*
           } else if (msg.action === "TOGGLE_CHAT") {
@@ -1293,7 +1293,7 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       sendMessageToBackground(payload) {
           console.log("Sending request to background:", payload);
-          chrome.runtime.sendMessage({ action: "REQUEST", payload })
+          chrome.runtime.sendMessage({ action: "NEW_MESSAGE", payload })
               .then(response => {
                   // Optional: Handle direct response from background if needed
                   // console.log("Direct response from background:", response);

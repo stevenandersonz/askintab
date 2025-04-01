@@ -1,8 +1,7 @@
 // Settings panel toggle
 document.addEventListener("DOMContentLoaded", async () => {
 const clearDataBTN = document.getElementById('clear-data-btn');
-const llmCfg = document.getElementById("llm-cfg");
-const promptShorcutInput = document.getElementById("prompterShortcut");
+const openaiKey = document.getElementById("openai-key");
 
 document.addEventListener("click", (e) => {
 
@@ -20,39 +19,11 @@ document.addEventListener("click", (e) => {
   }
 });
 
-llmCfg.addEventListener("change", async ({target}) => {
-  console.log(target.id)
-  await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[target.id]: target.checked}})
+openaiKey.addEventListener("input", async ({target}) => {
+  console.log(target.value)
+  await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {key:"openai_cfg", value: {key: target.value, instructions: ""}}})
 })
 
-llmCfg.addEventListener("input", async ({target}) => {
-  console.log(target.id)
-  await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[target.id]: target.value}})
-})
-
-let keysPressed = new Set();
-
-promptShorcutInput.addEventListener("keydown", async (event) => {
-    event.preventDefault();
-    keysPressed.add(event.key);
-    promptShorcutInput.value = Array.from(keysPressed).join(" + ");
-    console.log( Array.from(keysPressed).join(" + "))
-    await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {[promptShorcutInput.id]: promptShorcutInput.value}})
-});
-
-promptShorcutInput.addEventListener("keyup", () => {
-    keysPressed.clear();
-});
- 
-
-let cfg = await chrome.runtime.sendMessage({type: "GET_CFG"})
-promptShorcutInput.value = cfg.prompterShortcut;
-for (let el of llmCfg.querySelectorAll("input[type='checkbox']")){
-  el.checked = cfg[el.id]
-}
-
-for (let el of llmCfg.querySelectorAll("input:not([type='checkbox']), textarea")){
-  el.value = cfg[el.id]
-}
-
+let cfg = await chrome.runtime.sendMessage({type: "GET_CFG", payload: "openai_cfg"})
+openaiKey.value = cfg.key
 })

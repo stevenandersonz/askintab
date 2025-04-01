@@ -158,37 +158,25 @@
         </div>
 
         <div class="settings-content">
-            <div id="llm-cfg" class="settings-group">
+            <div id="openai-cfg" class="settings-group">
                 <h2>LLM Configuration</h2>
-                <div class="setting-item">
-                    <label for="returnFollowupQuestions">Return Follow-up Questions</label>
-                    <input type="checkbox" id="returnFollowupQuestions">
-                </div>
-                <div class="setting-item">
-                    <label for="mockResponse">Fake Response</label>
-                    <input type="checkbox" id="mockResponse">
-                </div>
                 <div class="setting-item setting-with-textarea">
-                    <label for="chatgptCfg">ChatGPT Prompt</label>
-                    <textarea id="chatgptCfg" placeholder="Enter ChatGPT configuration..."></textarea>
+                    <label for="openai-key">OpenAI API Key</label>
+                    <input class="large-input" type="text" id="openai-key" placeholder="Enter your OpenAI API key">
                 </div>
-                <div class="setting-item setting-with-textarea">
-                    <label for="openaiKey">OpenAI API Key</label>
-                    <input class="large-input" type="text" id="openaiKey" placeholder="Enter your OpenAI API key">
-                </div>
-                <div class="setting-item setting-with-textarea">
+                <!-- <div class="setting-item setting-with-textarea">
                     <label for="grokCfg">Grok Prompt</label>
                     <textarea id="grokCfg" placeholder="Enter Grok configuration..."></textarea>
-                </div>
+                </div> -->
             </div>
 
-            <div class="settings-group">
+            <!-- <div class="settings-group">
                 <h2>Shortcut Keys</h2>
                 <div class="setting-item">
                     <label for="prompterShortcut">Ask Question Shortcut</label>
                     <input type="text" id="prompterShortcut" placeholder="Press key combination">
                 </div>
-            </div>
+            </div> -->
 
             <div class="settings-group">
                 <h2>Data Management</h2>

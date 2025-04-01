@@ -1,6 +1,6 @@
 import Provider from "./provider.js"
-import db from "./db.js"
-import {cleanUrl} from"./helpers.js"
+import {createMessage, getConfig, updateConfig} from "./db_new.js"
+import {cleanUrl} from "./helpers.js"
 
 const DEBUG = true
 
@@ -68,87 +68,79 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   const { action, type, payload } = message;
 
   // --- Existing Message Handlers ---
-  if (action === "REQUEST") {
-    if (!payload.model) {
-        sendResponse({ error: `LLM is missing` });
-        return false; // Use false for synchronous response or if not returning true
-    }
+  if (action === "NEW_MESSAGE") {
+    if (!payload.model) sendResponse({ error: `LLM is missing` });
+
     let provider = Provider.findByModel(payload.model)
     if (DEBUG) console.log("provider", provider);
-    if (!provider) {
-        sendResponse({ error: `provider of model ${payload.model} is not available` });
-        return false;
-    }
-    const req = {
-      createdAt: Date.now(),
-      input: payload.input,
-      badges: payload.badges || [],
-      provider: {
-        lastMessageId: payload.lastMessageId,
-        model: payload.model,
-      },
-      sender: {
-        id: sender.tab?.id, // Sender might not always be a tab (e.g., popup)
-        title: sender.tab?.title,
-        url: sender.tab?.url ? cleanUrl(sender.tab.url) : null
-      },
-      status: "pending",
-    }
-    if (DEBUG) console.log("createRequest", req);
+    if (!provider) sendResponse({ error: `provider of model ${payload.model} is not available` });
 
-    // Ensure sender URL exists before adding page
-    if (req.sender.url) {
-        db.addPage(req.sender.url);
+    const msg = {
+      conversationId: payload?.conversationId,
+      message: {
+        text: payload.input,
+        ctxs: payload.badges || [],
+      },
+      model: payload.model,
+      lastMessageId: payload.lastMessageId,
+      type: "user",
+      tabId: sender.tab.id,
+      tabTitle: sender.tab.title,
+      tabUrl: sender.tab.url ? cleanUrl(sender.tab.url) : null
     }
 
-    db.createRequest(req).then(r => {
-      sendResponse(r); // Send response back to content script immediately
-      provider.processRequest(r); // Process request asynchronously
+    if (DEBUG) console.log("NEW_MESSAGE", msg);
+
+    createMessage(msg).then(msg => {
+      console.log("createMessage", msg)
+      sendResponse(msg.id); // Send response back to content script immediately
+      provider.send(msg); // Process request asynchronously
     }).catch(err => {
         console.error("Error creating/processing request:", err);
-        // Consider sending an error response back if appropriate
-        // sendResponse({ error: "Failed to process request" });
     });
 
     return true; // Indicate async response is being handled by the promise
   }
 
-  if(action === "GET_TABS") {
-    chrome.tabs.query({}, function(tabs) { sendResponse(tabs) });
-    return true; // Async
-  }
+  if(action === "GET_TABS"){
+    chrome.tabs.query({}, (tabs) => {
+      console.log("GET_TABS", tabs)
+      sendResponse(tabs);
+    });
+    return true
+  } 
   if(action === "GET_MODELS") {
     sendResponse(Provider.getModels());
     return false; // Sync
   }
-  if(type === "CLEAR_REQ") {
-    db.clearRequests().then(ok => sendResponse(ok));
-    return true; // Async
-  }
+  // if(type === "CLEAR_REQ") {
+  //   db.clearRequests().then(ok => sendResponse(ok));
+  //   return true; // Async
+  // }
   if(type === "GET_CFG") {
-    db.getCfg().then(cfg => sendResponse(cfg));
+    getConfig(payload).then(cfg => sendResponse(cfg));
     return true; // Async
   }
   if(type === "PUT_CFG") {
-    db.updateCfg(payload).then(cfg => sendResponse(cfg));
+    updateConfig(payload.key, payload.value).then(cfg => sendResponse(cfg));
     return true; // Async
   }
-  if (type === 'GET_ALL') {
-    db.getRequests().then(reqs => sendResponse(reqs));
-    return true; // Async
-  }
-  if(type === "GET_BY_URL") {
-    if (!payload) {
-        sendResponse({ error: "URL payload missing for GET_BY_URL" });
-        return false;
-    }
-    db.getRequestsByUrl(cleanUrl(payload)).then(reqs => sendResponse(reqs));
-    return true; // Async
-  }
-  if(type === "GET_URLS") {
-    db.getPages().then(urls => sendResponse(urls));
-    return true; // Async
-  }
+  // if (type === 'GET_ALL') {
+  //   db.getRequests().then(reqs => sendResponse(reqs));
+  //   return true; // Async
+  // }
+  // if(type === "GET_BY_URL") {
+  //   if (!payload) {
+  //       sendResponse({ error: "URL payload missing for GET_BY_URL" });
+  //       return false;
+  //   }
+  //   db.getRequestsByUrl(cleanUrl(payload)).then(reqs => sendResponse(reqs));
+  //   return true; // Async
+  // }
+  // if(type === "GET_URLS") {
+  //   db.getPages().then(urls => sendResponse(urls));
+  //   return true; // Async
+  // }
   if(type==="DEBUG" && DEBUG) {
     console.log(payload);
     return false; // Sync

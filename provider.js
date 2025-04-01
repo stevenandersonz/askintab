@@ -1,10 +1,10 @@
-import {mock, openAI} from "./llms/index.js"
-import db from "./db.js"
+import {openAI} from "./llms/index.js"
+import {createMessage} from "./db_new.js";
 
 const BASE = `if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
-for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.`
-const FUS = `Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
-  each question should be surrounded by <q> </q>
+for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.
+Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
+each question should be surrounded by <q> </q>
 `
 
 export default class Provider {
@@ -13,53 +13,60 @@ export default class Provider {
     this.name = name;
     this.lastUsed = null;
     this.tabId = null;
-    this.currentRequest = null;
     this.backend = backend;
     this.models = models
-    this.mockResponse = false
-    this.returnFollowupQuestions = true
     Provider.all.push(this)
   }
 
-  async processRequest(r) {
-    this.lastUsed = Date.now();
-    let cfg = await db.getCfg() 
-    this.mockResponse = cfg.mockResponse
-    this.returnFollowupQuestions = cfg.returnFollowupQuestions
-    let tabContext ="" 
-    if (r.badges && r.badges.length > 0) {
-      for (const badge of r.badges) {
-        if (badge.type === "tab" && badge.tabId) {
+  async buildContext(msg) {
+    if (msg.type === "user" && msg.message.ctxs.length > 0) {
+      let tabCtx = ""
+      let highlightCtx = ""
+      for (const ctx of msg.message.ctxs) {
+        if (ctx.type === "tab" && ctx.tabId) {
           let ret = await chrome.scripting.executeScript({
-            target: {tabId: parseInt(badge.tabId)},
+            target: {tabId: parseInt(ctx.tabId)},
             args: [],
             func: () => document.body.innerText
           })
-          tabContext += `\n -- text content of ${badge.tabUrl} -- \n` + ret[0].result
+          tabCtx += `\n -- text content of ${ctx.tabUrl} -- \n` + ret[0].result
+          continue
+        }
+        if (ctx.type === "highlight" && ctx.text) {
+          highlightCtx += `\n -- highlight -- \n` + ctx.text
+          continue
         }
       }
-    } 
-    console.log("tabContext")
-    console.log(tabContext)
-    this.currentRequest = r
-    if(this.mockResponse) return this.processResponse(mock(this))
-    let systemPrompt = BASE + (cfg.returnFollowupQuestions ? FUS : "") + cfg[this.name+"Cfg"] + tabContext
-    let userPrompt = this.currentRequest.input + "\n" + r.badges.filter(b => b.type !== "tab").map(b => b.text).join("\n")
-    let res = await this.backend({...cfg, systemPrompt, userPrompt, ...this.currentRequest.provider})
-    return await this.processResponse(res)
+      return {tabCtx, highlightCtx}
+    }
+    return {tabCtx: "", highlightCtx: ""}
   }
 
-  async processResponse(payload) {
+  async send(msg) {
+    this.lastUsed = Date.now();
+    let ctxs = await this.buildContext(msg)
+    let systemPrompt = BASE + ctxs.tabCtx 
+    let userPrompt = msg.message.text + ctxs.highlightCtx 
+    console.log(userPrompt)
+    this.backend({systemPrompt, userPrompt, ...msg}, this.onResponse)
+  }
+
+  async onResponse(r) {
     console.log("processResponse")
-    console.log(payload)
-    if(!this.currentRequest) return
-    this.currentRequest.provider.responseId = payload.responseId
-    this.currentRequest.provider.raw = payload.raw
-    this.currentRequest.provider.responseAt = payload.responseAt
-    this.currentRequest.status = "completed"
-    await db.updateRequestLLM(this.currentRequest.id, this.currentRequest.provider)
-    await chrome.tabs.sendMessage(this.currentRequest.sender.id, { action: "RESPONSE", payload: this.currentRequest.provider }); 
-    this.currentRequest = null
+    console.log(r)
+    let msg = await createMessage({
+      conversationId: r.conversationId,
+      tabId: r.tabId,
+      tabTitle: r.tabTitle,
+      tabUrl: r.tabUrl,
+      type: "assistant",
+      message: {
+        id: r.responseId,
+        text: r.text,
+        model: r.model,
+      },
+    })
+    chrome.tabs.sendMessage(r.tabId, { action: "NEW_MESSAGE", payload: msg }); 
   }
 
   static getModels = () => Provider.all.map(p => p.models).flat() 
