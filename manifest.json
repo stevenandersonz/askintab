@@ -4,7 +4,9 @@
   "manifest_version": 3,
   "permissions": [
     "tabs",
-    "scripting"
+    "scripting",
+    "commands",
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -14,17 +16,17 @@
     "type": "module"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "128": "./askintab.png"
     }
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"], 
-      "css": [],
-      "js": ["libs/mermaid.min.js","libs/marked.min.js","content_new.js"],
-      "run_at": "document_end"
+  "commands": {
+    "toggle-chat": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Toggle AskInTab Side Chat"
     }
-  ]
+  }
 }
