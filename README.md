@@ -32,6 +32,11 @@ All messages send to the LLMs are only share between you and the provider.
 - Scripting: to inject the side chat into the current tab
 - Commands: to open the side chat with `CRTL + K`
 
+## Local Dependencies
+these are injected into the current tab when the extension is loaded and they are loaded from the `libs` folder.
+- [marked.js](https://github.com/markedjs/marked)
+- [mermaid.js](https://github.com/mermaid-js/mermaid)
+
 ## Report Issues
 You can report issues here 
 

@@ -796,7 +796,7 @@ if (!window.hasInitializedAskInTabSideChat) {
         this.elements.spaceSelector.innerHTML = this.state.spaces
           .map(space => `<option value="${space.id}" ${space.id === this.state.selectedSpace.id ? 'selected' : ''}>${space.name}</option>`)
           .join('');
-        this.elements.tabMenuItems.innerHTML = this.state.tabs
+        this.elements.badgeMenu.innerHTML = this.state.tabs
           .map(tab => `<div class="badge-menu-item" data-type="tab" data-tab-id="${tab.id}" title="${tab.title}" data-tab-url="${tab.url}">${tab.title}</div>`)
           .join('');
       }
