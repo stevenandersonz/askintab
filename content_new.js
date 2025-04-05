@@ -140,15 +140,15 @@ if (!window.hasInitializedAskInTabSideChat) {
         this.currentHighlight = { range: null, text: "" }; // Temp storage for selection
         this.models = [];
         this.selectedModel = null;
+        this.selectedSpace = null;
         this.tabs = []; // Store available tabs for context
+        this.spaces = [];
       }
 
       getEmptyMessage() {
         return {
-          input: "",
-          type: "user", // Default type for new messages being composed
-          // highlight: { text: "", range: null }, // Deprecated, use badges
-          badges: [] // Stores { type: 'tab'|'highlight', text: '...', fullText?: '...', tabId?: '...', range?: '...' }
+          content: "",
+          sources: [] // Stores { type: 'tab'|'highlight', text: '...', fullText?: '...', tabId?: '...', range?: '...' }
         };
       }
 
@@ -159,18 +159,18 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       addBadge(badgeData) {
         // Avoid duplicates
-        const exists = this.currentMessage.badges.some(b =>
+        const exists = this.currentMessage.sources.some(b =>
           b.type === badgeData.type &&
           (b.text === badgeData.text || (b.type === 'tab' && b.tabId === badgeData.tabId))
         );
         if (exists) return false;
 
-        this.currentMessage.badges.push(badgeData);
+        this.currentMessage.sources.push(badgeData);
         return true;
       }
 
       removeBadge(badgeData) {
-        this.currentMessage.badges = this.currentMessage.badges.filter(b =>
+        this.currentMessage.sources = this.currentMessage.sources.filter(b =>
           !(b.type === badgeData.type && b.text === badgeData.text)
         );
       }
@@ -186,11 +186,16 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       async fetchInitialData() {
         try {
-            [this.models, this.tabs] = await Promise.all([
-                chrome.runtime.sendMessage({ action: "GET_MODELS" }),
-                chrome.runtime.sendMessage({ action: "GET_TABS" })
+            [this.models, this.tabs, this.spaces] = await Promise.all([
+                chrome.runtime.sendMessage({ type: "GET_MODELS" }),
+                chrome.runtime.sendMessage({ type: "GET_TABS" }),
+                chrome.runtime.sendMessage({ type: "GET_SPACES" })
             ]);
             this.selectedModel = this.models[0] || null; // Default to the first model
+            this.selectedSpace = this.spaces[0] || null; // Default to the first space
+            if(!this.selectedSpace) return
+            this.messages = await chrome.runtime.sendMessage({ type: "GET_MESSAGES_BY_SPACE", payload: this.selectedSpace.id });
+            console.log("Fetched Messages:", this.messages);
             console.log("Fetched Models:", this.models);
             console.log("Fetched Tabs:", this.tabs);
         } catch (error) {
@@ -198,7 +203,9 @@ if (!window.hasInitializedAskInTabSideChat) {
             // Provide default values or handle the error appropriately
             this.models = [];
             this.tabs = [];
+            this.spaces = [];
             this.selectedModel = null;
+            this.selectedSpace = null;
         }
       }
     }
@@ -550,8 +557,8 @@ if (!window.hasInitializedAskInTabSideChat) {
             background-repeat: no-repeat !important;
             background-position: right 6px center !important;
             padding-right: 20px !important; /* Space for arrow */
-            opacity: 0.7 !important;
             transition: opacity 0.2s !important;
+            opacity: 0.7 !important;
             z-index: 5; /* Above textarea */
           }
           .model-selector:hover {
@@ -561,7 +568,24 @@ if (!window.hasInitializedAskInTabSideChat) {
             background-color: #333 !important;
             color: #e0e0e0 !important;
           }
-
+          .space-selector {
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            opacity: 0.7 !important;
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+          }
+          .space-selector:hover {
+            opacity: 1 !important;
+          }
+          .space-selector option {
+            background-color: #333 !important;
+            color: #e0e0e0 !important;
+          }
+          .space-selector option:hover {
+            background-color: #4a8eff !important;
+            color: #fff !important;
+          }
           /* Send button */
           .send-btn {
             position: absolute !important;
@@ -694,18 +718,14 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       getHTMLTemplate() {
-          const tabMenuItems = this.state.tabs
-              .map(tab => `<div class="badge-menu-item" data-type="tab" data-tab-id="${tab.id}" title="${tab.title}" data-tab-url="${tab.url}">${tab.title}</div>`)
-              .join('');
-
-          // Start with chat-hidden class
           return `
           <div id="${SIDE_CHAT_CONTAINER_ID}">
             <div class="chat-header">
-              <h3>AI Chat (${EXT_NAME})</h3>
+              <h3>${EXT_NAME}</h3>
+              <select class="space-selector" title="Select a Space"> </select> 
               <div class="header-buttons">
                  <button class="header-btn settings-btn" title="Settings">
-                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="16px" height="16px">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.09-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.09.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
                    </svg>
                  </button>
@@ -722,8 +742,6 @@ if (!window.hasInitializedAskInTabSideChat) {
                 <!-- Badges added dynamically here -->
                 <div class="add-badge-btn" title="Add Context (Tab or Highlight)">+</div>
                 <div class="badge-menu">
-                  <div class="badge-menu-item" data-type="highlight">Add Selected Text</div>
-                  ${tabMenuItems}
                 </div>
               </div>
               <textarea class="chat-input" placeholder="Ask anything... (Shift+Enter for newline)"></textarea>
@@ -743,10 +761,11 @@ if (!window.hasInitializedAskInTabSideChat) {
           ${this.getHTMLTemplate()}
         `;
         this.initializeElements();
-        this.populateModels();
+        this.populateDropdowns();
         this.bindEvents();
         this.updateSendButtonState(); // Initial state
         // Show the chat on initial render (first injection)
+        this.populateMessages();
         this.toggleVisibility(true);
       }
 
@@ -759,6 +778,8 @@ if (!window.hasInitializedAskInTabSideChat) {
           input: $('.chat-input', this.root),
           sendBtn: $('.send-btn', this.root),
           modelSelector: $('.model-selector', this.root),
+          tabMenuItems: $$('.badge-menu-item', this.root),
+          spaceSelector: $('.space-selector', this.root),
           popover: $('.highlight-popover', this.root),
           badgeContainer: $('.badge-container', this.root),
           addBadgeBtn: $('.add-badge-btn', this.root),
@@ -767,15 +788,28 @@ if (!window.hasInitializedAskInTabSideChat) {
         };
       }
 
-      populateModels() {
-        if (!this.elements.modelSelector) return;
+      populateDropdowns() {
+        if (!this.elements.modelSelector || !this.elements.spaceSelector || !this.elements.tabMenuItems) return;
         this.elements.modelSelector.innerHTML = this.state.models
           .map(model => `<option value="${model}" ${model === this.state.selectedModel ? 'selected' : ''}>${model}</option>`)
           .join('');
+        this.elements.spaceSelector.innerHTML = this.state.spaces
+          .map(space => `<option value="${space.id}" ${space.id === this.state.selectedSpace.id ? 'selected' : ''}>${space.name}</option>`)
+          .join('');
+        this.elements.tabMenuItems.innerHTML = this.state.tabs
+          .map(tab => `<div class="badge-menu-item" data-type="tab" data-tab-id="${tab.id}" title="${tab.title}" data-tab-url="${tab.url}">${tab.title}</div>`)
+          .join('');
+      }
+
+      populateMessages() {
+        for (const msg of this.state.messages) {
+          this.addMessage(msg, msg.role === 'user');
+        }
       }
 
       bindEvents() {
         this.elements.closeBtn?.addEventListener('click', () => this.toggleVisibility(false));
+        this.elements.addBtn?.addEventListener('click', () => this.handleAddChat());
         this.elements.settingsBtn?.addEventListener('click', this.handleOpenSettings.bind(this)); // Bind settings button
         this.elements.sendBtn?.addEventListener('click', () => this.handleSendMessage());
         this.elements.input?.addEventListener('keypress', this.handleInputKeyPress.bind(this));
@@ -804,8 +838,7 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       handleOpenSettings() {
-          // Send message to background script to open the settings page
-          chrome.runtime.sendMessage({ action: "OPEN_SETTINGS" })
+          chrome.runtime.sendMessage({ type: "OPEN_SETTINGS" })
               .catch(error => console.error("AskInTab: Error sending OPEN_SETTINGS message:", error));
       }
 
@@ -815,14 +848,11 @@ if (!window.hasInitializedAskInTabSideChat) {
           if (!inputText && this.state.currentMessage.badges.length === 0) return;
 
           // Finalize current message state
-          this.state.currentMessage.input = inputText;
-          this.state.currentMessage.model = this.state.selectedModel;
+          this.state.currentMessage.content = inputText;
           this.state.currentMessage.lastMessageId = this.state.getLastMessageId();
 
-          const messageToSend = { ...this.state.currentMessage }; // Clone message
-
-          this.addMessage(messageToSend, true); // Add user message to UI
-          this.messageSender(messageToSend); // Send to background script
+          this.addMessage(this.state.currentMessage, true); // Add user message to UI
+          this.messageSender({...this.state.currentMessage, space: this.state.selectedSpace, model: this.state.selectedModel}); // Send to background script
 
           // Reset UI and state for next message
           this.elements.input.value = '';
@@ -844,8 +874,8 @@ if (!window.hasInitializedAskInTabSideChat) {
       updateSendButtonState() {
           if (!this.elements.sendBtn || !this.elements.input) return;
           const hasText = this.elements.input.value.trim().length > 0;
-          const hasBadges = this.state.currentMessage.badges.length > 0;
-          this.elements.sendBtn.disabled = !(hasText || hasBadges);
+          const hasSources = this.state.currentMessage.sources.length > 0;
+          this.elements.sendBtn.disabled = !(hasText || hasSources);
       }
 
       handleTextSelection(event) {
@@ -1034,26 +1064,26 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       renderUserMessage(messageEl, messageData) {
           // Display input text if present
-          if (messageData.input) {
-              const inputText = createElement('div', { textContent: messageData.input });
+          if (messageData.content) {
+              const inputText = createElement('div', { textContent: messageData.content });
               messageEl.appendChild(inputText);
           }
 
           // Display badges if present
-          if (messageData.badges && messageData.badges.length > 0) {
+          if (messageData.sources && messageData.sources.length > 0) {
               const badgesContainer = createElement('div', { className: 'message-badges' });
-              messageData.badges.forEach(badge => {
+              messageData.sources.forEach(source => {
                   const badgeEl = createElement('span', {
                       className: 'message-badge',
-                      textContent: `[${badge.text}]`,
-                      title: badge.fullText || badge.text
+                      textContent: `[${source.text}]`,
+                      title: source.fullText || source.text
                   });
-                  badgeEl.setAttribute('data-type', badge.type);
+                  badgeEl.setAttribute('data-type', source.type);
 
                   // Add click handler for highlight badges within the message history
-                  if (badge.type === 'highlight' && badge.range) {
+                  if (source.type === 'highlight' && source.range) {
                       badgeEl.addEventListener('click', () => {
-                          TextHighlighter.highlightTextInDocument(badge.range);
+                          TextHighlighter.highlightTextInDocument(source.range);
                       });
                   }
                   badgesContainer.appendChild(badgeEl);
@@ -1063,14 +1093,17 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       renderAssistantMessage(messageEl, messageData) {
-          const rawText = messageData.message.text || '';
           const questionRegex = /<q>(.*?)<\/q>/gs; // Regex to find <q> tags
           const questions = [];
-          let cleanedText = rawText.replace(questionRegex, (match, questionContent) => {
-              if (questionContent) {
-                  questions.push(questionContent.trim());
-              }
-              return ''; // Remove the <q> tag and its content from the main text
+          let cleanedText = messageData.content.replace(questionRegex, (match, questionContent) => {
+            // Use early return for empty content
+            if (!questionContent) {
+                return '';
+            }
+            // Push the valid content
+            questions.push(questionContent.trim());
+            // Explicitly return '' to remove the matched tag from the string
+            return '';
           }).trim(); // Remove leading/trailing whitespace potentially left after removal
 
           // Render the main content (without the <q> tags) using Marked
@@ -1293,7 +1326,7 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       sendMessageToBackground(payload) {
           console.log("Sending request to background:", payload);
-          chrome.runtime.sendMessage({ action: "NEW_MESSAGE", payload })
+          chrome.runtime.sendMessage({ type: "NEW_MESSAGE", payload })
               .then(response => {
                   // Optional: Handle direct response from background if needed
                   // console.log("Direct response from background:", response);
@@ -1322,7 +1355,7 @@ if (!window.hasInitializedAskInTabSideChat) {
             this.ui.addMessage({ raw: `Error: ${payload.error}` }, false);
         } else {
             this.ui.addMessage(payload, false); // Add assistant message to UI
-            this.state.addMessage({ ...payload, type: "assistant" }); // Store in state
+            this.state.addMessage({ ...payload }); // Store in state
         }
       }
     }

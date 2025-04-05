@@ -9,10 +9,10 @@ Now, since you asked for a diagram, I’ll sketch this out with something nifty 
 - 3
 
 This little chart shows how those four “batteries” feed into the system. Glucose or glycogen kicks things off with glycolysis, fats get broken down via beta-oxidation, proteins chip in through amino acids, and creatine phosphate gives a fast jolt—all funneling energy toward ATP synthase, which slaps that phosphate onto ADP. The proton gradient from the electron transport chain is the real powerhouse here—it’s like water turning a mill wheel.
-<q> 1 </q>
-<q> 1 </q>
-<q> 1 </q>
 `
+let fus = `<q>1</q>\n
+<q>2</q>\n
+<q>3</q>\n`
 
 let graph = `
 \`\`\`mermaid
@@ -26,7 +26,12 @@ graph TD
     H[Proteins] -->|Amino Acid Breakdown| C
     I[Creatine Phosphate] -->|Quick Burst| E
 \`\`\``
+let response2 = `"Hello! How can I assist you today? 
+<q>1</q>
+<q>Can you provide an analysis of a specific historical event?</q>
+<q>How can I improve my daily productivity and time management?</q>
+`
   setTimeout(() => {
-    onResponse({text: response + graph, responseId: "123", conversationId: msg.conversationId, tabId: msg.tabId, tabTitle: msg.tabTitle, tabUrl: msg.tabUrl})
+    onResponse({content: response2, responseId:"123", prevMsg: msg})
   }, 1000)
 }

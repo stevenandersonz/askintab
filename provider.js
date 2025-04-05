@@ -1,5 +1,5 @@
-import {openAI} from "./llms/index.js"
-import {createMessage} from "./db_new.js";
+import {mock, openAI} from "./llms/index.js"
+import db from "./db_new.js";
 
 const BASE = `if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.
@@ -19,21 +19,21 @@ export default class Provider {
   }
 
   async buildContext(msg) {
-    if (msg.type === "user" && msg.message.ctxs.length > 0) {
+    if (msg.sources.length > 0) {
       let tabCtx = ""
       let highlightCtx = ""
-      for (const ctx of msg.message.ctxs) {
-        if (ctx.type === "tab" && ctx.tabId) {
+      for (const source of msg.sources) {
+        if (source.type === "tab" && source.tabId) {
           let ret = await chrome.scripting.executeScript({
-            target: {tabId: parseInt(ctx.tabId)},
+            target: {tabId: parseInt(source.tabId)},
             args: [],
             func: () => document.body.innerText
           })
-          tabCtx += `\n -- text content of ${ctx.tabUrl} -- \n` + ret[0].result
+          tabCtx += `\n -- text content of ${source.tabUrl} -- \n` + ret[0].result
           continue
         }
-        if (ctx.type === "highlight" && ctx.text) {
-          highlightCtx += `\n -- highlight -- \n` + ctx.text
+        if (source.type === "highlight" && source.text) {
+          highlightCtx += `\n -- highlight -- \n` + source.text
           continue
         }
       }
@@ -43,34 +43,29 @@ export default class Provider {
   }
 
   async send(msg) {
+    console.log("send", msg)
     this.lastUsed = Date.now();
     let ctxs = await this.buildContext(msg)
     let systemPrompt = BASE + ctxs.tabCtx 
-    let userPrompt = msg.message.text + ctxs.highlightCtx 
+    let userPrompt = msg.content + ctxs.highlightCtx 
     console.log(userPrompt)
+    let ok = await db.addMessage({ ...msg, role: "user",hidden: false,timestamp: Date.now()})
+    if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error sending message to provider"}})
     this.backend({systemPrompt, userPrompt, ...msg}, this.onResponse)
   }
 
   async onResponse(r) {
     console.log("processResponse")
     console.log(r)
-    let msg = await createMessage({
-      conversationId: r.conversationId,
-      tabId: r.tabId,
-      tabTitle: r.tabTitle,
-      tabUrl: r.tabUrl,
-      type: "assistant",
-      message: {
-        id: r.responseId,
-        text: r.text,
-        model: r.model,
-      },
-    })
-    chrome.tabs.sendMessage(r.tabId, { action: "NEW_MESSAGE", payload: msg }); 
+    let msg = { spaceId: r.prevMsg.spaceId, model: r.prevMsg.model, providerMsgId: r.responseId, tabId: r.prevMsg.tabId, role: "assistant", content: r.content, hidden: false, timestamp: Date.now() }
+    let ok = await db.addMessage(msg)
+    if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error returning response"}})
+    chrome.tabs.sendMessage(r.prevMsg.tabId, { action: "NEW_MESSAGE", payload: msg }); 
   }
 
   static getModels = () => Provider.all.map(p => p.models).flat() 
   static findByModel = (model) => Provider.all.filter(p => p.models.includes(model))[0] 
 }
 
+new Provider('mock', mock, ["mock"])
 new Provider('openai', openAI, ["gpt-4o"])

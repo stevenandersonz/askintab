@@ -1,15 +1,11 @@
-import { getConfig } from "../db_new.js"
-import { mock } from "./mock.js"
-
+import db from "../db_new.js"
 export async function openAI(msg, onResponse){
-  const {userPrompt, systemPrompt, model, lastMessageId } = msg
-  let cfg = await getConfig("openai_cfg")
-  if(false) return mock(msg, onResponse)
+  const {userPrompt, systemPrompt, model } = msg
+  let cfg = await db.getConfig("openai_cfg")
   if(!cfg.key) throw new Error("OpenAI key is not set")
   let body = JSON.stringify({
     model: model,
     instructions: systemPrompt,
-    previous_response_id: lastMessageId ? lastMessageId : null,
     input: userPrompt,
   })
   console.log(JSON.parse(body))
@@ -31,11 +27,7 @@ export async function openAI(msg, onResponse){
   console.log(data)
   onResponse({
     responseId: data.id,
-    text: data.output[0].content[0].text,
-    model: model,
-    conversationId: msg.conversationId,
-    tabId: msg.tabId,
-    tabTitle: msg.tabTitle,
-    tabUrl: msg.tabUrl, 
+    content: data.output[0].content[0].text,
+    prevMsg: msg
   });
 }

@@ -1,6 +1,5 @@
 import Provider from "./provider.js"
-import {createMessage, getConfig, updateConfig} from "./db_new.js"
-import {cleanUrl} from "./helpers.js"
+import db from "./db_new.js"
 
 const DEBUG = true
 
@@ -8,10 +7,6 @@ const DEBUG = true
 
 const CONTENT_SCRIPTS = ["libs/marked.min.js", "libs/mermaid.min.js", "content_new.js"];
 
-/**
- * Injects or toggles the side chat in the specified tab.
- * @param {chrome.tabs.Tab} tab The target tab.
- */
 async function injectOrToggleChat(tab) {
   if (!tab || !tab.id) {
     console.error("AskInTab: Invalid tab provided.");
@@ -64,95 +59,106 @@ chrome.commands.onCommand.addListener((command, tab) => {
 
 
 // Listener for messages from content scripts or other parts
-chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-  const { action, type, payload } = message;
+chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  const { type, payload } = msg;
 
   // --- Existing Message Handlers ---
-  if (action === "NEW_MESSAGE") {
+  if (type === "NEW_MESSAGE") {
     if (!payload.model) sendResponse({ error: `LLM is missing` });
-
     let provider = Provider.findByModel(payload.model)
     if (DEBUG) console.log("provider", provider);
     if (!provider) sendResponse({ error: `provider of model ${payload.model} is not available` });
-
-    const msg = {
-      conversationId: payload?.conversationId,
-      message: {
-        text: payload.input,
-        ctxs: payload.badges || [],
-      },
-      model: payload.model,
-      lastMessageId: payload.lastMessageId,
-      type: "user",
-      tabId: sender.tab.id,
-      tabTitle: sender.tab.title,
-      tabUrl: sender.tab.url ? cleanUrl(sender.tab.url) : null
-    }
-
-    if (DEBUG) console.log("NEW_MESSAGE", msg);
-
-    createMessage(msg).then(msg => {
-      console.log("createMessage", msg)
-      sendResponse(msg.id); // Send response back to content script immediately
-      provider.send(msg); // Process request asynchronously
-    }).catch(err => {
-        console.error("Error creating/processing request:", err);
-    });
-
-    return true; // Indicate async response is being handled by the promise
+    // Expected: { type: "NEW_MESSAGE", text, model, sources, spaceId (optional) }
+    sendResponse({ success: true });
+    console.log("payload", payload)
+    console.log("sender", sender)
+    provider.send({ tabId: sender.tab.id, content: payload.content, sources: payload.sources, model: payload.model, spaceId: payload.space.id })
+    return false; // Early return for async response
   }
 
-  if(action === "GET_TABS"){
+  if(type === "GET_MESSAGES_BY_SPACE"){
+    console.log("GET_MESSAGES_BY_SPACE", payload)
+    db.getMessagesBySpace(payload).then(messages => {
+      sendResponse(messages)
+    })
+    return true
+  }
+
+  if(type === "GET_SPACES"){
+    db.getSpaces().then(spaces => {
+      sendResponse(spaces)
+    })
+    return true
+  }
+  // PUT_CONFIG handling
+  if (type === 'PUT_CONFIG') {
+    // Expected: { type: "PUT_CONFIG", key, config }
+    db.updateConfig(payload.key, payload.value)
+      .then(() => {
+        sendResponse({ success: true });
+      })
+      .catch(error => {
+        sendResponse({ success: false, error });
+      });
+    return true; // Early return for async response
+  }
+
+  if(type === "GET_CONFIG"){
+    console.log("GET_CONFIG", payload)
+    db.getConfig(payload).then(cfg => {
+      sendResponse(cfg)
+    })
+    return true
+  }
+
+  if(type === "CLEAR_MESSAGES"){
+    db.clearMessages().then(() => {
+      sendResponse({ success: true });
+    })
+    return true
+  }
+
+  if(type === "GET_TABS"){
     chrome.tabs.query({}, (tabs) => {
       console.log("GET_TABS", tabs)
       sendResponse(tabs);
     });
     return true
   } 
-  if(action === "GET_MODELS") {
+
+  if(type === "GET_MODELS") {
     sendResponse(Provider.getModels());
     return false; // Sync
   }
-  // if(type === "CLEAR_REQ") {
-  //   db.clearRequests().then(ok => sendResponse(ok));
-  //   return true; // Async
-  // }
-  if(type === "GET_CFG") {
-    getConfig(payload).then(cfg => sendResponse(cfg));
-    return true; // Async
-  }
-  if(type === "PUT_CFG") {
-    updateConfig(payload.key, payload.value).then(cfg => sendResponse(cfg));
-    return true; // Async
-  }
-  // if (type === 'GET_ALL') {
-  //   db.getRequests().then(reqs => sendResponse(reqs));
-  //   return true; // Async
-  // }
-  // if(type === "GET_BY_URL") {
-  //   if (!payload) {
-  //       sendResponse({ error: "URL payload missing for GET_BY_URL" });
-  //       return false;
-  //   }
-  //   db.getRequestsByUrl(cleanUrl(payload)).then(reqs => sendResponse(reqs));
-  //   return true; // Async
-  // }
-  // if(type === "GET_URLS") {
-  //   db.getPages().then(urls => sendResponse(urls));
-  //   return true; // Async
-  // }
-  if(type==="DEBUG" && DEBUG) {
-    console.log(payload);
-    return false; // Sync
-  }
 
-  // --- New Message Handler ---
-  if (action === "OPEN_SETTINGS") {
+  if (type === "OPEN_SETTINGS") {
     chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
     // No response needed, return false or nothing
     return false;
   }
+});
 
-  // Default: Indicate message was not handled asynchronously
-  // return false; // Can be omitted if no other async paths exist
+// Handle extension installation or update
+chrome.runtime.onInstalled.addListener(async (details) => {
+  // Check if this is a first install or an update
+  if (details.reason === 'install' || details.reason === 'update') {
+    try {
+      let spaces = await db.getSpaces()
+      // If no spaces exist, create the draftbox space
+      console.log("spaces", spaces)
+      if (!spaces || spaces.length === 0) {
+        const draftboxSpace = {
+          id: 'draftbox-' + Date.now(),
+          name: 'draftbox',
+          created: Date.now(),
+          sourceIds: []
+        };
+        
+        await db.addSpace(draftboxSpace);
+        console.log('Created default draftbox space');
+      }
+    } catch (error) {
+      console.error('Error setting up initial space:', error);
+    }
+  }
 });

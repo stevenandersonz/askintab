@@ -13,7 +13,7 @@ document.addEventListener("click", (e) => {
       <animate attributeName="stroke-dashoffset" from="100" to="0" dur="1s" repeatCount="indefinite"/>
     </circle>
     </svg>`
-    chrome.runtime.sendMessage({type: "CLEAR_REQ"}, (ok) => {
+    chrome.runtime.sendMessage({type: "CLEAR_MESSAGES"}, (ok) => {
       clearDataBTN.innerHTML = "Clear all data"
     })
   }
@@ -21,9 +21,9 @@ document.addEventListener("click", (e) => {
 
 openaiKey.addEventListener("input", async ({target}) => {
   console.log(target.value)
-  await chrome.runtime.sendMessage({type: "PUT_CFG", payload: {key:"openai_cfg", value: {key: target.value, instructions: ""}}})
+  await chrome.runtime.sendMessage({type: "PUT_CONFIG", payload: {key:"openai_cfg", value: {key: target.value}}})
 })
 
-let cfg = await chrome.runtime.sendMessage({type: "GET_CFG", payload: "openai_cfg"})
+let cfg = await chrome.runtime.sendMessage({type: "GET_CONFIG", payload: "openai_cfg"})
 openaiKey.value = cfg.key
 })
