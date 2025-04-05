@@ -1,8 +1,10 @@
-[] when loading highlight into a url check if text match if not alert 
-[] add alert for prompt too large
-[] what can we do if prompt too large 
-[] support new chat creation 
-[] support cancel chat grok 
-[] support cancel chat chatgpt 
-[] support annotation versioning in pages
-[] support images
+[] create new spaces
+[] support sources of type space
+[] export spaces
+[] minimal admin center (see sources, spaces)
+[] on install show welcome screen with onboarding
+[] improve source menu
+[] rewrite content_new
+[] clean up project
+[] add debug mode
+
