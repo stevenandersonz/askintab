@@ -1,159 +1,115 @@
-class DB {
-  constructor() {
-    this.DEFAULT_CFG = {
-      mockResponse: false,
-      returnFollowupQuestions: true,
-      prompterShortcut: "Control + k",
-      chatgptCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would.",
-      openaiKey: "",
-      grokCfg: "You are the reincarnation of Dr Feynman, you don't know it so just play the role, and answer as Feynman would."
+const DB_NAME = 'aiChatDB';
+const DB_VERSION = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = function (event) {
+      const db = event.target.result;
+
+      if (!db.objectStoreNames.contains('spaces')) {
+        const spaceStore = db.createObjectStore('spaces', { keyPath: 'id' });
+        spaceStore.createIndex('name', 'name', { unique: false });
+        spaceStore.createIndex('sourceIds', 'sourceIds', { multiEntry: true });
+      }
+
+      if (!db.objectStoreNames.contains('messages')) {
+        const messageStore = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        messageStore.createIndex('spaceId', 'spaceId', { unique: false });
+        messageStore.createIndex('spaceId_timestamp', ['spaceId', 'timestamp'], { unique: false });
+        messageStore.createIndex('referenceIds', 'referenceIds', { multiEntry: true });
+      }
+
+      if (!db.objectStoreNames.contains('sources')) {
+        const sourceStore = db.createObjectStore('sources', { keyPath: 'id' });
+        sourceStore.createIndex('byUrl', 'url', { unique: false });
+        sourceStore.createIndex('byUrlContent', ['url', 'content'], { unique: true });
+        sourceStore.createIndex('spaceRef', 'spaceRef', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('config')) {
+        // The config store doesn't use a keyPath; keys are provided externally.
+        db.createObjectStore('config');
+      }
     };
-    this.dbName = "askintab_db";
-    this.dbVersion = 1;
-    this.dbPromise = this.init();
-  }
 
-  // Initialize IndexedDB
-  init() {
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+function crudOperation(storeName, method, value, key = undefined) {
+  return openDB().then(db => {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.dbVersion);
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        const store = db.createObjectStore("requests", { autoIncrement: true });
-        store.createIndex("by_url", "sender.url", { unique: false });
-        db.createObjectStore("config", { keyPath: "key" });
-        db.createObjectStore("llms", { keyPath: "name" });
-        db.createObjectStore("pages", { keyPath: "url" });
-      };
-
+      const mode = method === 'get' ? 'readonly' : 'readwrite';
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      console.log("crudOperation", storeName, method, value, key)
+      const request = key === undefined ? store[method](value) : store[method](value, key);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-  }
-
-  // Helper to execute transactions
-  async transact(storeName, mode, callback) {
-    const db = await this.dbPromise;
-    const transaction = db.transaction([storeName], mode);
-    const store = transaction.objectStore(storeName);
-    return callback(store, transaction);
-  }
-
-  // Request Operations
-  async getRequestById(id) {
-    return this.transact("requests", "readonly", (store) => {
-      return new Promise((resolve) => {
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result || null);
-      });
-    });
-  }
-
-  async getRequests() {
-    return this.transact("requests", "readonly", (store) => {
-      return new Promise((resolve) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-      });
-    });
-  }
-
-  async getRequestsByUrl(url) {
-    return this.transact("requests", "readonly", (store) => {
-      return new Promise((resolve) => {
-        const index = store.index("by_url"); // Use the index
-        const request = index.getAll(url);   // Get all records where sender.url matches
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => resolve([]); // Fallback to empty array on error
-      });
-    });
-  }
-
-  async createRequest(request) {
-    return this.transact("requests", "readwrite", (store) => {
-      return new Promise((resolve) => {
-        const requestOp = store.add(request);
-        requestOp.onsuccess = () => {
-          request.id = requestOp.result; // The auto-generated ID
-          store.put(request, request.id)
-          resolve(request);
-        };
-        requestOp.onerror = () => resolve(null); 
-      });
-    });
-  }
-
-  async updateRequestLLM(id, llm) {
-    let currentReq = await this.getRequestById(id);
-    if (!currentReq) return null;
-    currentReq.llm = llm;
-    return this.transact("requests", "readwrite", (store) => {
-      return new Promise((resolve) => {
-        const requestOp = store.put(currentReq, id);
-        requestOp.onsuccess = () => resolve(currentReq);
-        requestOp.onerror = () => resolve(null);
-      });
-    });
-  }
-
-  async clearRequests() {
-    return this.transact("requests", "readwrite", (store) => {
-      return new Promise((resolve, reject) => {
-        const request = store.clear();
-        request.onsuccess = () => {
-          console.log("All data in 'requests' store cleared");
-          resolve(true);
-        };
-        request.onerror = () => {
-          console.error("Error clearing 'requests' store:", request.error);
-          reject(request.error);
-        };
-      });
-    });
-  }
-
-  // Config Operations
-  async getCfg() {
-    return this.transact("config", "readonly", (store) => {
-      return new Promise((resolve) => {
-        const request = store.get("cfg");
-        request.onsuccess = () => resolve(request.result?.value || this.DEFAULT_CFG);
-      });
-    });
-  }
-
-  async updateCfg(cfg) {
-    console.log(cfg)
-    const currentCfg = await this.getCfg();
-    const updatedCfg = { ...currentCfg, ...cfg };
-    return this.transact("config", "readwrite", (store) => {
-      return new Promise((resolve) => {
-        const request = store.put({ key: "cfg", value: updatedCfg });
-        request.onsuccess = () => resolve(updatedCfg);
-      });
-    });
-  }
-
-
-  async getPages() {
-    return this.transact("pages", "readonly", (store) => {
-      return new Promise((resolve) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result.map(r => r.url));
-      });
-    });
-  }
-
-  async addPage(url) {
-    return this.transact("pages", "readwrite", (store) => {
-      return new Promise((resolve) => {
-        const request = store.put({ url });
-        request.onsuccess = () => resolve(url);
-      });
-    });
-  }
-
+  });
 }
 
-export default new DB()
+function getAllFromIndex(index, keyRange) {
+  return new Promise((resolve, reject) => {
+    const items = [];
+    const request = index.openCursor(keyRange);
+    request.onsuccess = function (event) {
+      const cursor = event.target.result;
+      if (cursor) {
+        items.push(cursor.value);
+        cursor.continue();
+      } else {
+        resolve(items);
+      }
+    };
+    request.onerror = function () {
+      reject(request.error);
+    };
+  });
+}
+
+/* ================= CRUD OPERATIONS ================= */
+
+const db = {
+  addSpace: async (space) => crudOperation('spaces', 'add', space),
+  getSpace: async (id) => crudOperation('spaces', 'get', id),
+  getSpaces: async () => crudOperation('spaces', 'getAll'),
+  updateSpace: async (space) => crudOperation('spaces', 'put', space),
+  deleteSpace: async (id) => crudOperation('spaces', 'delete', id),
+  
+  // Messages
+  addMessage: async (message) => crudOperation('messages', 'add', message),
+  getMessage: async (id) => crudOperation('messages', 'get', id),
+  getMessages: async () => crudOperation('messages', 'getAll'),
+  updateMessage: async (message) => crudOperation('messages', 'put', message),
+  deleteMessage: async (id) => crudOperation('messages', 'delete', id),
+  clearMessages: async () => crudOperation('messages', 'clear'),
+  getMessagesBySpace: async (spaceId) => {
+    const dbInstance = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = dbInstance.transaction('messages', 'readonly');
+      const store = tx.objectStore('messages');
+      const index = store.index('spaceId_timestamp');
+      const keyRange = IDBKeyRange.bound([spaceId, 0], [spaceId, Infinity]);
+      getAllFromIndex(index, keyRange)
+        .then(messages => resolve(messages))
+        .catch(err => reject(err));
+    });
+  },
+  
+  // Sources
+  addSource: async (source) => crudOperation('sources', 'add', source),
+  getSource: async (id) => crudOperation('sources', 'get', id),
+  updateSource: async (source) => crudOperation('sources', 'put', source),
+  deleteSource: async (id) => crudOperation('sources', 'delete', id),
+  
+  // Config
+  addConfig: async (key, config) => crudOperation('config', 'add', config, key),
+  getConfig: async (key) => crudOperation('config', 'get', key),
+  updateConfig: async (key, config) => crudOperation('config', 'put', config, key),
+  deleteConfig: async (key) => crudOperation('config', 'delete', key)
+};
+export default db;

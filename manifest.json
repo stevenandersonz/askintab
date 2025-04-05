@@ -1,15 +1,12 @@
 {
   "name": "Ask in Tab",
-  "version": "0.5",
+  "version": "0.1",
   "manifest_version": 3,
   "permissions": [
     "tabs",
     "scripting",
     "commands",
-    "storage"
-  ],
-  "host_permissions": [
-    "<all_urls>"
+    "activeTab"
   ],
   "background": {
     "service_worker": "background.js",
@@ -26,7 +23,7 @@
         "default": "Ctrl+K",
         "mac": "Command+K"
       },
-      "description": "Toggle AskInTab Side Chat"
+      "description": "Toggle Ask in Tab chat"
     }
   }
 }

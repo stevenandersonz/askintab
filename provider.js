@@ -1,5 +1,5 @@
 import {mock, openAI} from "./llms/index.js"
-import db from "./db_new.js";
+import db from "./db.js";
 
 const BASE = `if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.

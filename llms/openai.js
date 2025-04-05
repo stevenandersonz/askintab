@@ -1,4 +1,4 @@
-import db from "../db_new.js"
+import db from "../db.js"
 export async function openAI(msg, onResponse){
   const {userPrompt, systemPrompt, model } = msg
   let cfg = await db.getConfig("openai_cfg")

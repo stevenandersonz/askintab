@@ -1,11 +1,11 @@
 import Provider from "./provider.js"
-import db from "./db_new.js"
+import db from "./db.js"
 
 const DEBUG = true
 
 // --- Injection and Toggling Logic ---
 
-const CONTENT_SCRIPTS = ["libs/marked.min.js", "libs/mermaid.min.js", "content_new.js"];
+const CONTENT_SCRIPTS = ["libs/marked.min.js", "libs/mermaid.min.js", "content.js"];
 
 async function injectOrToggleChat(tab) {
   if (!tab || !tab.id) {
