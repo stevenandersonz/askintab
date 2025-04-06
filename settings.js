@@ -2,6 +2,7 @@
 document.addEventListener("DOMContentLoaded", async () => {
 const clearDataBTN = document.getElementById('clear-data-btn');
 const openaiKey = document.getElementById("openai-key");
+const toggleKeyVisibility = document.getElementById("toggle-key-visibility");
 
 document.addEventListener("click", (e) => {
 
@@ -17,6 +18,12 @@ document.addEventListener("click", (e) => {
       clearDataBTN.innerHTML = "Clear all data"
     })
   }
+});
+
+toggleKeyVisibility.addEventListener("click", () => {
+    const isPassword = openaiKey.type === "password";
+    openaiKey.type = isPassword ? "text" : "password";
+    toggleKeyVisibility.textContent = isPassword ? "Hide" : "Show";
 });
 
 openaiKey.addEventListener("input", async ({target}) => {

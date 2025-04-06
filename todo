@@ -7,4 +7,6 @@
 [] rewrite content_new
 [] clean up project
 [] add debug mode
-
+[] store sources
+[x] make the api key password like
+[] explore side panel api instead of injecting content script

@@ -59,6 +59,7 @@
         }
 
         .setting-item {
+            gap: 10px;
             display: flex;
             align-items: center;
             margin-bottom: 15px;
@@ -80,7 +81,7 @@
             cursor: pointer;
         }
 
-        .setting-item input[type="text"] {
+        .setting-item input[type="text"], .setting-item input[type="password"] {
             width: 150px;
             padding: 8px;
             background-color: #4d4d4d;
@@ -162,22 +163,12 @@
                 <h2>LLM Configuration</h2>
                 <div class="setting-item setting-with-textarea">
                     <label for="openai-key">OpenAI API Key</label>
-                    <input class="large-input" type="text" id="openai-key" placeholder="Enter your OpenAI API key">
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <input class="large-input" type="password" id="openai-key" placeholder="Enter your OpenAI API key" style="flex-grow: 1; margin-right: 10px;">
+                    </div>
+                    <span id="toggle-key-visibility" style="align-self: flex-end; cursor: pointer; text-decoration: underline; color: #cccccc; font-size: 14px;">Show</span>
                 </div>
-                <!-- <div class="setting-item setting-with-textarea">
-                    <label for="grokCfg">Grok Prompt</label>
-                    <textarea id="grokCfg" placeholder="Enter Grok configuration..."></textarea>
-                </div> -->
             </div>
-
-            <!-- <div class="settings-group">
-                <h2>Shortcut Keys</h2>
-                <div class="setting-item">
-                    <label for="prompterShortcut">Ask Question Shortcut</label>
-                    <input type="text" id="prompterShortcut" placeholder="Press key combination">
-                </div>
-            </div> -->
-
             <div class="settings-group">
                 <h2>Data Management</h2>
                 <div class="setting-item">
