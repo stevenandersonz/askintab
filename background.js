@@ -68,17 +68,16 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
     let provider = Provider.findByModel(payload.model)
     if (DEBUG) console.log("provider", provider);
     if (!provider) sendResponse({ error: `provider of model ${payload.model} is not available` });
-    // Expected: { type: "NEW_MESSAGE", text, model, sources, spaceId (optional) }
     sendResponse({ success: true });
     console.log("payload", payload)
     console.log("sender", sender)
-    provider.send({ tabId: sender.tab.id, content: payload.content, sources: payload.sources, model: payload.model, spaceId: payload.space.id })
+    provider.send({ tab: sender.tab, content: payload.content, sources: payload.sources, model: payload.model, spaceId: payload.space.id })
     return false; // Early return for async response
   }
 
-  if(type === "GET_MESSAGES_BY_SPACE"){
-    console.log("GET_MESSAGES_BY_SPACE", payload)
-    db.getMessagesBySpace(payload).then(messages => {
+  if(type === "GET_MESSAGES"){
+    console.log("GET_MESSAGES", payload)
+    db.getMessages().then(messages => {
       sendResponse(messages)
     })
     return true
@@ -86,11 +85,49 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
 
   if(type === "GET_SPACES"){
     db.getSpaces().then(spaces => {
-      sendResponse(spaces)
-    })
-    return true
+      sendResponse(spaces);
+    }).catch(error => {
+         console.error("Error getting spaces:", error);
+         sendResponse([]); // Send empty array on error
+    });
+    return true;
   }
-  // PUT_CONFIG handling
+  // Add new space
+  if (type === 'ADD_SPACE') {
+      let newSpace = {
+        id: 'space-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8), // More unique ID
+        name: 'New Space',
+        createdAt: Date.now(),
+        model: 'gpt-4o',
+        selected: false,
+        sources: [], // Start with empty sources
+      }
+      db.addSpace(newSpace).then(() => sendResponse({ success: true, space: newSpace }))
+        .catch(error => sendResponse({ success: false, error: error.message || "Failed to save space" }));
+      return true; // Indicate async response
+  }
+
+   // Update existing space (currently just for model)
+   if (type === 'UPDATE_SPACE') {
+    if (!payload && !payload.id) { // Check for model specifically
+      sendResponse({ success: false, error: "Missing space ID or model" });
+      return false;
+    }
+    console.log("Updating space:", payload.id);
+
+    db.updateSpace(payload)
+      .then((updatedSpace) => {
+        console.log("Space updated successfully", updatedSpace);
+        sendResponse({ success: true, space: updatedSpace });
+      })
+      .catch(error => {
+        console.error("Error updating space:", error);
+        sendResponse({ success: false, error: error.message || "Failed to update space" });
+      });
+    return true; // Indicate async response
+   }
+
+  // PUT_CONFIG handling (keep for generic config like API keys)
   if (type === 'PUT_CONFIG') {
     // Expected: { type: "PUT_CONFIG", key, config }
     db.updateConfig(payload.key, payload.value)
@@ -124,7 +161,7 @@ chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
       sendResponse(tabs);
     });
     return true
-  } 
+  }
 
   if(type === "GET_MODELS") {
     sendResponse(Provider.getModels());
@@ -144,18 +181,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install' || details.reason === 'update') {
     try {
       let spaces = await db.getSpaces()
-      // If no spaces exist, create the draftbox space
       console.log("spaces", spaces)
       if (!spaces || spaces.length === 0) {
-        const draftboxSpace = {
-          id: 'draftbox-' + Date.now(),
-          name: 'draftbox',
-          created: Date.now(),
-          sourceIds: []
-        };
-        
-        await db.addSpace(draftboxSpace);
-        console.log('Created default draftbox space');
+       await db.addSpace({
+          id: 'default-' + Date.now(),
+          name: 'default',
+          createdAt: Date.now(),
+          selected: true,
+          sources: []
+        });
       }
     } catch (error) {
       console.error('Error setting up initial space:', error);

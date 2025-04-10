@@ -138,11 +138,6 @@ if (!window.hasInitializedAskInTabSideChat) {
         this.messages = []; // Stores { type: 'user'|'assistant', ...messageData }
         this.currentMessage = this.getEmptyMessage();
         this.currentHighlight = { range: null, text: "" }; // Temp storage for selection
-        this.models = [];
-        this.selectedModel = null;
-        this.selectedSpace = null;
-        this.tabs = []; // Store available tabs for context
-        this.spaces = [];
       }
 
       getEmptyMessage() {
@@ -158,15 +153,7 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       addBadge(badgeData) {
-        // Avoid duplicates
-        const exists = this.currentMessage.sources.some(b =>
-          b.type === badgeData.type &&
-          (b.text === badgeData.text || (b.type === 'tab' && b.tabId === badgeData.tabId))
-        );
-        if (exists) return false;
-
         this.currentMessage.sources.push(badgeData);
-        return true;
       }
 
       removeBadge(badgeData) {
@@ -186,26 +173,10 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       async fetchInitialData() {
         try {
-            [this.models, this.tabs, this.spaces] = await Promise.all([
-                chrome.runtime.sendMessage({ type: "GET_MODELS" }),
-                chrome.runtime.sendMessage({ type: "GET_TABS" }),
-                chrome.runtime.sendMessage({ type: "GET_SPACES" })
-            ]);
-            this.selectedModel = this.models[0] || null; // Default to the first model
-            this.selectedSpace = this.spaces[0] || null; // Default to the first space
-            if(!this.selectedSpace) return
-            this.messages = await chrome.runtime.sendMessage({ type: "GET_MESSAGES_BY_SPACE", payload: this.selectedSpace.id });
-            console.log("Fetched Messages:", this.messages);
-            console.log("Fetched Models:", this.models);
-            console.log("Fetched Tabs:", this.tabs);
+          this.messages = await chrome.runtime.sendMessage({ type: "GET_MESSAGES" });
+          console.log("Fetched Messages:", this.messages);
         } catch (error) {
-            console.error("Error fetching initial data:", error);
-            // Provide default values or handle the error appropriately
-            this.models = [];
-            this.tabs = [];
-            this.spaces = [];
-            this.selectedModel = null;
-            this.selectedSpace = null;
+          console.error("Error fetching initial data:", error);
         }
       }
     }
@@ -235,7 +206,6 @@ if (!window.hasInitializedAskInTabSideChat) {
       }
 
       getStyles() {
-        // Keep styles here for simplicity, or load from external CSS
         return `
           /* Container styles */
           #${SIDE_CHAT_CONTAINER_ID} {
@@ -722,7 +692,7 @@ if (!window.hasInitializedAskInTabSideChat) {
           <div id="${SIDE_CHAT_CONTAINER_ID}">
             <div class="chat-header">
               <h3>${EXT_NAME}</h3>
-              <select class="space-selector" title="Select a Space"> </select> 
+
               <div class="header-buttons">
                  <button class="header-btn settings-btn" title="Settings">
                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -739,13 +709,8 @@ if (!window.hasInitializedAskInTabSideChat) {
 
             <div class="chat-input-container">
               <div class="badge-container">
-                <!-- Badges added dynamically here -->
-                <div class="add-badge-btn" title="Add Context (Tab or Highlight)">+</div>
-                <div class="badge-menu">
-                </div>
               </div>
               <textarea class="chat-input" placeholder="Ask anything... (Shift+Enter for newline)"></textarea>
-              <select class="model-selector" title="Select AI Model"></select>
               <button class="send-btn" title="Send Message" disabled>Send</button>
             </div>
           </div>
@@ -761,7 +726,6 @@ if (!window.hasInitializedAskInTabSideChat) {
           ${this.getHTMLTemplate()}
         `;
         this.initializeElements();
-        this.populateDropdowns();
         this.bindEvents();
         this.updateSendButtonState(); // Initial state
         // Show the chat on initial render (first injection)
@@ -777,28 +741,9 @@ if (!window.hasInitializedAskInTabSideChat) {
           messages: $('.chat-messages', this.root),
           input: $('.chat-input', this.root),
           sendBtn: $('.send-btn', this.root),
-          modelSelector: $('.model-selector', this.root),
-          tabMenuItems: $$('.badge-menu-item', this.root),
-          spaceSelector: $('.space-selector', this.root),
           popover: $('.highlight-popover', this.root),
           badgeContainer: $('.badge-container', this.root),
-          addBadgeBtn: $('.add-badge-btn', this.root),
-          badgeMenu: $('.badge-menu', this.root),
-          badgeMenuItems: $$('.badge-menu-item', this.root)
         };
-      }
-
-      populateDropdowns() {
-        if (!this.elements.modelSelector || !this.elements.spaceSelector || !this.elements.tabMenuItems) return;
-        this.elements.modelSelector.innerHTML = this.state.models
-          .map(model => `<option value="${model}" ${model === this.state.selectedModel ? 'selected' : ''}>${model}</option>`)
-          .join('');
-        this.elements.spaceSelector.innerHTML = this.state.spaces
-          .map(space => `<option value="${space.id}" ${space.id === this.state.selectedSpace.id ? 'selected' : ''}>${space.name}</option>`)
-          .join('');
-        this.elements.badgeMenu.innerHTML = this.state.tabs
-          .map(tab => `<div class="badge-menu-item" data-type="tab" data-tab-id="${tab.id}" title="${tab.title}" data-tab-url="${tab.url}">${tab.title}</div>`)
-          .join('');
       }
 
       populateMessages() {
@@ -809,21 +754,11 @@ if (!window.hasInitializedAskInTabSideChat) {
 
       bindEvents() {
         this.elements.closeBtn?.addEventListener('click', () => this.toggleVisibility(false));
-        this.elements.addBtn?.addEventListener('click', () => this.handleAddChat());
         this.elements.settingsBtn?.addEventListener('click', this.handleOpenSettings.bind(this)); // Bind settings button
         this.elements.sendBtn?.addEventListener('click', () => this.handleSendMessage());
         this.elements.input?.addEventListener('keypress', this.handleInputKeyPress.bind(this));
         this.elements.input?.addEventListener('input', this.updateSendButtonState.bind(this));
-        this.elements.modelSelector?.addEventListener('change', (e) => {
-          this.state.selectedModel = e.target.value;
-        });
         this.elements.popover?.addEventListener('click', this.handleAddHighlightBadge.bind(this));
-        this.elements.addBadgeBtn?.addEventListener('click', this.toggleBadgeMenu.bind(this));
-
-        // Badge Menu Item Clicks
-        this.elements.badgeMenuItems.forEach(item => {
-          item.addEventListener('click', this.handleAddBadgeFromMenu.bind(this, item));
-        });
 
         // Global listeners (consider scoping or cleanup)
         document.addEventListener('mouseup', this.handleTextSelection.bind(this));
@@ -852,11 +787,11 @@ if (!window.hasInitializedAskInTabSideChat) {
           this.state.currentMessage.lastMessageId = this.state.getLastMessageId();
 
           this.addMessage(this.state.currentMessage, true); // Add user message to UI
-          this.messageSender({...this.state.currentMessage, space: this.state.selectedSpace, model: this.state.selectedModel}); // Send to background script
+          this.messageSender({...this.state.currentMessage }); // Send to background script
 
           // Reset UI and state for next message
           this.elements.input.value = '';
-          this.clearBadgesFromInput();
+          $$('.custom-badge', this.elements.badgeContainer).forEach(badge => badge.remove());
           this.state.resetCurrentMessage();
           this.updateSendButtonState(); // Disable send button
           this.showTypingIndicator();
@@ -933,7 +868,8 @@ if (!window.hasInitializedAskInTabSideChat) {
                     this.state.currentHighlight.text.substring(0, 17) + '...' :
                     this.state.currentHighlight.text,
               fullText: this.state.currentHighlight.text,
-              range: this.state.currentHighlight.range
+              range: this.state.currentHighlight.range,
+              url: window.location.href
           };
 
           if (this.state.addBadge(highlightData)) {
@@ -947,20 +883,8 @@ if (!window.hasInitializedAskInTabSideChat) {
           window.getSelection()?.removeAllRanges(); // Clear document selection
       }
 
-      toggleBadgeMenu(event) {
-        event?.stopPropagation(); // Prevent document click listener from closing immediately
-        this.elements.badgeMenu?.classList.toggle('active');
-      }
-
-      closeBadgeMenu() {
-          this.elements.badgeMenu?.classList.remove('active');
-      }
 
       handleDocumentClick(event) {
-          // Close badge menu if click is outside the menu and the add button
-          if (!this.elements.badgeMenu?.contains(event.target) && !this.elements.addBadgeBtn?.contains(event.target)) {
-              this.closeBadgeMenu();
-          }
           // Hide popover if click is outside the popover
           if (!this.elements.popover?.contains(event.target)) {
                // Check if the click was on the popover's trigger area (selection)
@@ -971,37 +895,6 @@ if (!window.hasInitializedAskInTabSideChat) {
           }
       }
 
-      handleAddBadgeFromMenu(item) {
-          const badgeType = item.dataset.type;
-          if (!badgeType) return;
-
-          let badgeData = null;
-
-          if (badgeType === 'highlight') {
-              // Trigger the same logic as clicking the popover
-              this.handleAddHighlightBadge();
-              this.closeBadgeMenu();
-              return; // Exit early as addHighlightBadge handles UI/state
-          } else if (badgeType === 'tab') {
-              const tabId = item.dataset.tabId;
-              const tabUrl = item.dataset.tabUrl;
-              const tabTitle = item.getAttribute('title') || item.textContent; // Use title for full text
-              if (!tabId) return;
-              badgeData = {
-                  type: 'tab',
-                  text: tabTitle.length > 20 ? tabTitle.substring(0, 17) + '...' : tabTitle,
-                  tabUrl: tabUrl,
-                  fullText: tabTitle,
-                  tabId: tabId
-              };
-          }
-
-          if (badgeData && this.state.addBadge(badgeData)) {
-              this.addBadgeToUI(badgeData);
-              this.updateSendButtonState(); // Enable send button if needed
-          }
-          this.closeBadgeMenu();
-      }
 
       addBadgeToUI(badgeData) {
         const badge = createElement('div', {
@@ -1019,12 +912,9 @@ if (!window.hasInitializedAskInTabSideChat) {
         });
         badge.appendChild(badgeText);
 
-        // Add click handler for highlight badges to re-highlight text
-        if (badgeData.type === 'highlight' && badgeData.range) {
-          badgeText.addEventListener('click', () => {
-            TextHighlighter.highlightTextInDocument(badgeData.range);
-          });
-        }
+        badgeText.addEventListener('click', () => {
+          TextHighlighter.highlightTextInDocument(badgeData.range);
+        });
 
         const closeBtn = createElement('button', {
           className: 'custom-badge-close',
@@ -1043,9 +933,6 @@ if (!window.hasInitializedAskInTabSideChat) {
         this.elements.badgeContainer?.insertBefore(badge, this.elements.addBadgeBtn);
       }
 
-      clearBadgesFromInput() {
-          $$('.custom-badge', this.elements.badgeContainer).forEach(badge => badge.remove());
-      }
 
       addMessage(messageData, isUser = false) {
         const messageEl = createElement('div', {

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./askintab.png" type="image/png">
+    <title>Settings - AskInTab</title>
+    <style>
+        body {
+            font-family: 'Lucida Console', monospace;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+            flex-grow: 1;
+        }
+
+        .header {
+            background-color: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .settings-content {
+            background-color: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .settings-group {
+            margin-bottom: 30px;
+        }
+
+        .settings-group h2 {
+            margin: 0 0 20px 0;
+            font-size: 20px;
+            color: #ffffff;
+            border-bottom: 1px solid #4d4d4d;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 36px;
+            box-sizing: border-box;
+        }
+
+        .new-space-form-container {
+            display: none;
+            margin: -10px 0 15px 0;
+            padding: 15px;
+            background-color: #3a3a3a;
+            border-radius: 0 0 4px 4px;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .new-space-form-container input[type="text"] {
+            flex-grow: 1;
+            padding: 8px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+        }
+
+        .new-space-form-container button {
+            padding: 8px 10px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            flex-shrink: 0;
+        }
+        .new-space-form-container button:hover {
+             background-color: #5d5d5d;
+         }
+
+        .settings-group h2 button#add-space-btn {
+             padding: 5px 10px;
+             font-size: 16px;
+             background-color: #4d4d4d;
+             color: #ffffff;
+             border: 1px solid #5d5d5d;
+             border-radius: 4px;
+             cursor: pointer;
+             transition: background-color 0.2s;
+             margin-left: auto;
+        }
+
+        .settings-group h2 button#add-space-btn:hover {
+            background-color: #5d5d5d;
+        }
+
+        .setting-item {
+            gap: 10px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: transparent;
+        }
+
+        .setting-item label {
+            flex: 1;
+            margin-right: 15px;
+            color: #cccccc;
+            font-size: 16px;
+        }
+
+        .setting-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .setting-item input[type="text"], .setting-item input[type="password"] {
+            width: 150px;
+            padding: 8px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+        }
+
+        .setting-item input[type="text"].large-input {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .setting-item textarea {
+            width: 100%;
+            height: 100px;
+            padding: 8px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+            resize: vertical;
+            margin-top: 10px;
+        }
+
+        .setting-item button {
+            padding: 8px 15px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .setting-item button:hover {
+            background-color: #5d5d5d;
+            border-color: #6d6d6d;
+        }
+
+        .setting-item input[type="text"]:focus,
+        .setting-item textarea:focus {
+            outline: none;
+            border-color: #7d7d7d;
+            background-color: #5d5d5d;
+        }
+
+        .setting-with-textarea {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .setting-item select {
+            width: 150px;
+            padding: 8px;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            border: 1px solid #5d5d5d;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: 'Lucida Console', monospace;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .setting-item select:focus {
+            outline: none;
+            border-color: #7d7d7d;
+            background-color: #5d5d5d;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #888888;
+            font-size: 12px;
+            background-color: #2d2d2d;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Settings - Ask in Tab</h1>
+        </div>
+
+        <div class="settings-content">
+            <div id="space-cfg" class="settings-group">
+                <h2 id="spaces-header">
+                     <span class="space-title-text">Spaces</span>
+                     <button id="add-space-btn" title="Add new space">+</button>
+                </h2>
+                <div id="new-space-form" class="new-space-form-container">
+                    <input type="text" id="new-space-name-input" placeholder="Enter new space name...">
+                    <button id="save-space-btn">Save</button>
+                    <button id="cancel-space-btn">Cancel</button>
+                </div>
+                <div id="spaces-list">
+                    <!-- Space items will be dynamically added here -->
+                </div>
+            </div>
+
+            <div id="openai-cfg" class="settings-group">
+                <h2>LLM Configuration</h2>
+                <div class="setting-item setting-with-textarea">
+                    <label for="openai-key">OpenAI API Key</label>
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <input class="large-input" type="password" id="openai-key" placeholder="Enter your OpenAI API key" style="flex-grow: 1; margin-right: 10px;">
+                    </div>
+                    <span id="toggle-key-visibility" style="align-self: flex-end; cursor: pointer; text-decoration: underline; color: #cccccc; font-size: 14px;">Show</span>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h2>Data Management</h2>
+                <div class="setting-item">
+                    <label for="clear-data-btn">Clear All Data</label>
+                    <button id="clear-data-btn">Clear Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        AskInTab Settings © 2025
+    </footer>
+
+    <script src="./settings.js">
+    </script>
+</body>
+</html>

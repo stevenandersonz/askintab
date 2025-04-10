@@ -12,55 +12,45 @@ export default class Provider {
   constructor(name, backend, models=[]) {
     this.name = name;
     this.lastUsed = null;
-    this.tabId = null;
     this.backend = backend;
     this.models = models
+    this.userPrompt = ""
+    this.systemPrompt = BASE 
+    this.cxts = []
     Provider.all.push(this)
   }
 
-  async buildContext(msg) {
-    if (msg.sources.length > 0) {
-      let tabCtx = ""
-      let highlightCtx = ""
-      for (const source of msg.sources) {
-        if (source.type === "tab" && source.tabId) {
-          let ret = await chrome.scripting.executeScript({
-            target: {tabId: parseInt(source.tabId)},
-            args: [],
-            func: () => document.body.innerText
-          })
-          tabCtx += `\n -- text content of ${source.tabUrl} -- \n` + ret[0].result
-          continue
-        }
-        if (source.type === "highlight" && source.text) {
-          highlightCtx += `\n -- highlight -- \n` + source.text
-          continue
-        }
+  async handleSources(sources) {
+    let sourceIds = []
+    for (const source of sources) {
+      if (source.type === "highlight" && source.text) {
+        let ok = await db.addSource({ id: "123", type: "highlight", text: source.text, url: source.url, range: source.range })
+        if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error adding highlight"}})
+        sourceIds.push(ok.id)
+        this.cxts.push(`\n -- start highlight -- \n` + source.text + `\n -- end highlight -- \n`)
       }
-      return {tabCtx, highlightCtx}
     }
-    return {tabCtx: "", highlightCtx: ""}
+    return sourceIds
   }
 
-  async send(msg) {
-    console.log("send", msg)
-    this.lastUsed = Date.now();
-    let ctxs = await this.buildContext(msg)
-    let systemPrompt = BASE + ctxs.tabCtx 
-    let userPrompt = msg.content + ctxs.highlightCtx 
-    console.log(userPrompt)
-    let ok = await db.addMessage({ ...msg, role: "user",hidden: false,timestamp: Date.now()})
+  async send({tab, content, sources, model, spaceId}) {
+    // let sourceIds = await this.handleSources(sources)
+    let ok = await db.addMessage({ url: tab.url, content, model, spaceId, role: "user", timestamp: Date.now()})
     if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error sending message to provider"}})
-    this.backend({systemPrompt, userPrompt, ...msg}, this.onResponse)
+    this.lastUsed = Date.now();
+    this.model = model
+    this.spaceId = spaceId
+    this.sender = tab
+    this.cxts.push("\n -- user prompt -- \n" + content)
+    this.backend.call(this)
   }
 
   async onResponse(r) {
     console.log("processResponse")
     console.log(r)
-    let msg = { spaceId: r.prevMsg.spaceId, model: r.prevMsg.model, providerMsgId: r.responseId, tabId: r.prevMsg.tabId, role: "assistant", content: r.content, hidden: false, timestamp: Date.now() }
-    let ok = await db.addMessage(msg)
+    let ok = await db.addMessage({ spaceId: this.spaceId, model: this.model, url: this.sender.url, role: "assistant", providerMsgId: r.responseId, content: r.content, timestamp: Date.now() })
     if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error returning response"}})
-    chrome.tabs.sendMessage(r.prevMsg.tabId, { action: "NEW_MESSAGE", payload: msg }); 
+    chrome.tabs.sendMessage(this.sender.id, { action: "NEW_MESSAGE", payload: {content: r.content} }); 
   }
 
   static getModels = () => Provider.all.map(p => p.models).flat() 

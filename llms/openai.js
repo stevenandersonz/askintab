@@ -3,11 +3,13 @@ export async function openAI(msg, onResponse){
   const {userPrompt, systemPrompt, model } = msg
   let cfg = await db.getConfig("openai_cfg")
   if(!cfg.key) throw new Error("OpenAI key is not set")
+
   let body = JSON.stringify({
     model: model,
     instructions: systemPrompt,
     input: userPrompt,
   })
+
   console.log(JSON.parse(body))
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -28,6 +30,5 @@ export async function openAI(msg, onResponse){
   onResponse({
     responseId: data.id,
     content: data.output[0].content[0].text,
-    prevMsg: msg
   });
 }
