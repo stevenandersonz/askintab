@@ -51,6 +51,16 @@ const db = (debug = false) => {
     // Messages
     addMessage: async (message) => crudOperation('messages', 'add', message),
     getMessages: async () => crudOperation('messages', 'getAll'),
+    clearMessages: async (spaceId) => {
+      if (!spaceId) return [];
+      const messages = await crudOperation('messages', 'getAll');
+      for (const message of messages) {
+        if (message.spaceId === spaceId) {
+          await crudOperation('messages', 'delete', message.id);
+        }
+      };
+      return messages;
+    },
     getMessagesBySpaceId: async (spaceId) => {
       if (!spaceId) return [];
       
@@ -66,7 +76,7 @@ const db = (debug = false) => {
         });
       });
     },
-    clearMessages: async () => crudOperation('messages', 'clear'),
+    
 
     // Config
     addConfig: async (key, config) => crudOperation('config', 'add', config, key),

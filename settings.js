@@ -162,27 +162,34 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
     contentArea.innerHTML = `
       <h2>Edit Space: ${space.name}</h2>
       <div>
-      <div class="setting-item mod-horizontal">
-        <div class="setting-info">
-          <label for="space-name-input">Name</label>
+        <div class="setting-item mod-horizontal">
+          <div class="setting-info">
+            <label for="space-name-input">Name</label>
+          </div>
+          <div class="setting-item-control">
+            <input type="text" id="space-name-input" value="${space.name}">
+          </div>
         </div>
-        <div class="setting-item-control">
-          <input type="text" id="space-name-input" value="${space.name}">
+        <div class="setting-item mod-horizontal">
+          <div class="setting-info">
+            <label for="space-model-select">Model</label>
+          </div>
+          <div class="setting-item-control">
+          <select id="space-model-select">
+              ${state.models.map(model =>
+                `<option value="${model.id}" ${space.model === model.id ? 'selected' : ''}>${model.name}</option>`
+              ).join('')}
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="setting-item mod-horizontal">
-        <div class="setting-info">
-          <label for="space-model-select">Model</label>
+        <div class="setting-item mod-horizontal">
+          <div class="setting-info">
+            <label for="space-messages-select">Messages</label>
+          </div>
+          <div class="setting-item-control">
+            <button id="delete-messages-btn">Delete Messages</button>
+          </div>
         </div>
-        <div class="setting-item-control">
-        <select id="space-model-select">
-            ${state.models.map(model =>
-              `<option value="${model.id}" ${space.model === model.id ? 'selected' : ''}>${model.name}</option>`
-            ).join('')}
-          </select>
-        </div>
-      </div>
-      
       </div>
       <div>
         <h3>Pages</h3>
@@ -224,6 +231,13 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
       if(response.success) {
         space.model = event.target.value;
         renderSidebar();
+      }
+    });
+
+    $(`#delete-messages-btn`).addEventListener('click', async function handleDeleteMessages(event) {
+      let response = await chrome.runtime.sendMessage({ type: "DELETE_MESSAGES", payload:{spaceId: space.id} });
+      if(response.success) {
+        renderSpaceSettings();
       }
     });
 

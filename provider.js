@@ -1,5 +1,3 @@
-import db from "./db.js";
-
 const SYSTEM_PROMPT = `
 if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.
@@ -19,6 +17,10 @@ export const models = [
   {
     id: "google/gemini-2.5-flash-preview",
     name: "Gemini 2.5 Flash",
+  },
+  {
+    id: "openai/gpt-4.1-mini",
+    name: "GPT-4.1 Mini",
   }
 ]
 
@@ -40,7 +42,7 @@ async function forwardToOpenRouter(content, model, apiKey) {
   return response.choices[0].message.content
 }
 
-export async function sendToProvider(content, debug = false) {
+export async function sendToProvider(db, content, debug = false) {
   let [spaceid, apiKey] = await Promise.all([
     db.getConfig("currentSpace"),
     db.getConfig("openRouterApiKey")

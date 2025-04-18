@@ -77,15 +77,16 @@ function createListener(handlerMap) {
 /* ------------------------------------------------------------------ */
 const handlers = {
   NEW_MESSAGE: ({ content }) => {
-    sendToProvider(content, DEBUG);
+    sendToProvider(db, content, DEBUG);
     return { success: true };
   },
 
   GET_MESSAGES: async () => db.getMessages(),
   GET_MESSAGES_BY_SPACE_ID: async () => db.getMessagesBySpaceId(await db.getConfig('currentSpace')),
 
-  CLEAR_MESSAGES: async () => {
-    await db.clearMessages();
+  DELETE_MESSAGES: async payload => {
+    await db.clearMessages(payload.spaceId);
+    chrome.runtime.sendMessage({ type: 'SYNC_SPACE' });
     return { success: true };
   },
 
@@ -135,7 +136,7 @@ const handlers = {
       hash: payload.page.hash
     });
     await db.updateSpace(space);
-    chrome.runtime.sendMessage({ type: 'SYNC_SPACE', payload: space });
+    chrome.runtime.sendMessage({ type: 'SYNC_SPACE' });
     return { success: true, id };
   },
 

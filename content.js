@@ -16,7 +16,6 @@ const S = {
   msgs: [],
   models: [],
   draft: '',
-  lastAssistantId: null,
 };
 
 /* ── DOM scaffold (same ids / classes as before) ────────────────────────── */
@@ -49,10 +48,10 @@ const UI = {
 const md = (txt) => {
   if (typeof marked === 'undefined') return esc(txt);
   const r = new marked.Renderer();
-  r.code = (code, lang) =>
-    lang === 'mermaid'
-      ? `<div class="mermaid">${esc(code)}</div>`
-      : `<pre><code>${esc(code)}</code></pre>`;
+  r.code = (toks) =>
+    toks.lang === 'mermaid'
+      ? `<div class="mermaid">${esc(toks.text)}</div>`
+      : `<pre><code>${esc(toks.text)}</code></pre>`;
   return marked.parse(txt, { renderer: r });
 };
 
@@ -61,15 +60,36 @@ const renderMermaid = (host) => {
   $$('.mermaid', host).forEach(div => {
     const code = div.textContent;
     div.textContent = '';
-    mermaid.render(`m${Math.random().toString(36).slice(2)}`, code)
-      .then(({ svg }) => (div.innerHTML = svg))
-      .catch(err   => (div.innerHTML = `<pre>Error: ${esc(err.message)}</pre>`));
+    let id = `m${Math.random().toString(36).slice(2)}`;
+    mermaid.render(id, code)
+      .then(({ svg }) => {
+          const blob = new Blob([svg], { type: 'image/svg+xml' });
+          const url = URL.createObjectURL(blob);
+        const btn = `
+        <a class="download-svg-btn" href="${url}" download="${id}.svg">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
+            xmlns="http://www.w3.org/2000/svg" style="display:block;">
+            <path d="M10 2v10m0 0l-4-4m4 4l4-4M4 16h12" stroke="#444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      `;
+        div.innerHTML = btn + '<br>' + svg;
+      })
+      .catch(err => {
+        div.innerHTML = `<pre>Error: ${esc(err.message)}</pre>`;
+      });
   });
 };
 
+/*
+CSS needed for the download icon button (add to your stylesheet):
+
+
+*/
+
 /* ── Message rendering ──────────────────────────────────────────────────── */
 const addMsg = (m) => {
-  const assistant = (m.role || m.type) === 'assistant';
+  const assistant = m.role === 'assistant';
   const wrap = e('div', {
     className: `message ${assistant ? 'assistant-message' : 'user-message'}`
   });
@@ -77,20 +97,21 @@ const addMsg = (m) => {
   if (assistant) {
     wrap.innerHTML = md(m.content);
     renderMermaid(wrap);
+    hideTyping();
   } else {
     if (m.content) wrap.appendChild(e('div', { textContent: m.content }));
 
-    if (S.space.sources?.length) {
-      const bc = e('div', { className: 'message-badges' });
-      S.space.sources.forEach(src => {
-        bc.appendChild(e('span', {
-          className: 'message-badge',
-          textContent: `[${src.titlext}]`,
-          title: src.fullText || src.text
-        }));
-      });
-      wrap.appendChild(bc);
-    }
+    // if (S.space.sources?.length) {
+    //   const bc = e('div', { className: 'message-badges' });
+    //   S.space.sources.forEach(src => {
+    //     bc.appendChild(e('span', {
+    //       className: 'message-badge',
+    //       textContent: `[${src.titlext}]`,
+    //       title: src.fullText || src.text
+    //     }));
+    //   });
+    //   wrap.appendChild(bc);
+    // }
   }
   UI.list.appendChild(wrap);
   UI.list.scrollTop = UI.list.scrollHeight;
@@ -108,26 +129,19 @@ const hideTyping = () => $('.typing-indicator', UI.list)?.remove();
 
 /* ── Chat flow helpers ──────────────────────────────────────────────────── */
 const updateSendBtn = () =>
-  (UI.send.disabled = !(UI.input.value.trim() || S.sources.length));
+  (UI.send.disabled = !(UI.input.value.trim()));
 
 const sendDraft = () => {
   const content = UI.input.value.trim();
-  if (!content && !S.sources.length) return;
+  if (!content) return;
 
-  const payload = { content, sources: S.sources, lastMessageId: S.lastAssistantId };
-  addMsg({ role: 'user', content, sources: S.sources });
+  addMsg({ role: 'user', content });
 
-  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload })
-    .catch(err => console.error('AskInTab: BG send error', err));
+  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload: { content } })
 
-  UI.input.value = ''; UI.badges.textContent = '';
-  updateSendBtn(); showTyping();
-};
-
-const acceptAssistant = (data) => {
-  hideTyping();
-  addMsg({ role: 'assistant', content: data.content, responseId: data.responseId });
-  S.lastAssistantId = data.responseId;
+  UI.input.value = '';
+  updateSendBtn();
+  showTyping();
 };
 
 const addBadge = (source) => {
@@ -169,26 +183,21 @@ UI.modelSelector.onchange = async (e) => {
   }
 };
 
-document.addEventListener('mouseup', onSelect);
-document.addEventListener('click',  (e)=>{ if (!UI.pop.contains(e.target)) hidePop(); });
 
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener(async (msg) => {
   if (msg.type === 'SYNC_SPACE') {
-    console.log("syncing space", msg.payload)
-    S.space = msg.payload;
     UI.badges.innerHTML = '';
     UI.modelSelector.innerHTML = '';
-    S.space.sources.forEach(addBadge);
-    S.models.forEach(addModelOption);
+    UI.list.innerHTML = '';
+    await init();
   }
   if (msg.type === 'ASSISTANT_MESSAGE') {
-    acceptAssistant(msg.payload);
+    addMsg({ role: 'assistant', content: msg.payload.content });
   }
+
 });
 
-
-/* ── Bootstrap ──────────────────────────────────────────────────────────── */
-(async () => {
+async function init() {
   try {
     [S.msgs, S.space, S.models] = await Promise.all([
       chrome.runtime.sendMessage({ type: 'GET_MESSAGES_BY_SPACE_ID' }),
@@ -198,6 +207,9 @@ chrome.runtime.onMessage.addListener((msg) => {
     S.msgs.forEach(addMsg);
     S.space.sources.forEach(addBadge);
     S.models.forEach(addModelOption);
-    S.lastAssistantId = S.msgs.filter(m => (m.role || m.type) === 'assistant').at(-1)?.responseId;
   } catch (e) { console.error('AskInTab init error', e); }
+}
+/* ── Bootstrap ──────────────────────────────────────────────────────────── */
+(async () => {
+  await init();
 })();

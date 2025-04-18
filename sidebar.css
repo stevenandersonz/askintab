@@ -507,6 +507,7 @@
   margin: 10px 0;
   border: 1px solid #444;
   text-align: center;
+  position: relative;
   /* Center diagram */
 }
 
@@ -601,4 +602,20 @@
   background-color: #4a8eff;
   /* Highlight color on hover */
   color: #fff;
+}
+
+
+.download-svg-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: none;
+  border-radius: 4px;
+  padding: 2px;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.2s;
+}
+.download-svg-btn:hover {
+  background: #e0e0e0;
 }
