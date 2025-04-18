@@ -96,22 +96,27 @@ const addMsg = (m) => {
 
   if (assistant) {
     wrap.innerHTML = md(m.content);
+    console.log("m.annotations", m.annotations)
+    if (m.annotations && m.annotations.length > 0) {
+      const bc = e('div', { className: 'message-badges' });
+      m.annotations.forEach(a => {
+        bc.appendChild(e('a', {
+          className: 'message-badge',
+          textContent: `${a.url_citation.title}`,
+          title: a.url_citation.title,
+          href: a.url_citation.url,
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }));
+      });
+      wrap.appendChild(bc);
+    }
     renderMermaid(wrap);
     hideTyping();
   } else {
     if (m.content) wrap.appendChild(e('div', { textContent: m.content }));
 
-    // if (S.space.sources?.length) {
-    //   const bc = e('div', { className: 'message-badges' });
-    //   S.space.sources.forEach(src => {
-    //     bc.appendChild(e('span', {
-    //       className: 'message-badge',
-    //       textContent: `[${src.titlext}]`,
-    //       title: src.fullText || src.text
-    //     }));
-    //   });
-    //   wrap.appendChild(bc);
-    // }
+    
   }
   UI.list.appendChild(wrap);
   UI.list.scrollTop = UI.list.scrollHeight;
@@ -167,7 +172,7 @@ const addBadge = (source) => {
 };
 
 const addModelOption = (model) => {
-  const option = e('option', { value: model.id, textContent: model.name, selected: model.id === S.space.model.id });
+  const option = e('option', { value: model.id, textContent: model.name, selected: model.id === S.space.model });
   
   UI.modelSelector.appendChild(option);
 };
@@ -192,7 +197,7 @@ chrome.runtime.onMessage.addListener(async (msg) => {
     await init();
   }
   if (msg.type === 'ASSISTANT_MESSAGE') {
-    addMsg({ role: 'assistant', content: msg.payload.content });
+    addMsg({ role: 'assistant', content: msg.payload.content, annotations: msg.payload.annotations });
   }
 
 });
