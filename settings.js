@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
     models: [], // Added more models
     spaces: [],
     hotKeys: [{ description: "open side chat", id: "cmd+k" }],
-    sourceTypes: ['website', 'folder', 'pdf'] // Available source types
+    openRouterApiKey: '',
+    currentSpace: '',
   };
   // utils
   const $ = (selector) => document.querySelector(selector);
@@ -16,9 +17,11 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
 
   // --- Initialization ---
   async function initialize() {
-    [state.models, state.spaces] = await Promise.all([
+    [state.models, state.spaces, state.currentSpace, state.openRouterApiKey, state.tabs] = await Promise.all([
       chrome.runtime.sendMessage({ type: "GET_MODELS" }),
-      chrome.runtime.sendMessage({ type: "GET_SPACES" })
+      chrome.runtime.sendMessage({ type: "GET_SPACES" }),
+      chrome.runtime.sendMessage({ type: "GET_CONFIG", payload: "currentSpace" }),
+      chrome.runtime.sendMessage({ type: "GET_CONFIG", payload: "openRouterApiKey" }),
     ]);
     console.log("state.models", state.models)
     console.log("state.spaces", state.spaces)
@@ -80,35 +83,73 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
     if (section === 'spaces') return renderSpaceSettings();
   }
 
-  function renderGeneralSettings() {
+  async function renderGeneralSettings() {
+    // Fetch the current API key
     contentArea.innerHTML = `
       <h2>General Settings</h2>
-      <div class="form-group">
-        <label for="current-space-select">Current Space</label>
-        <select id="current-space-select">
-          ${state.spaces.map(space =>
-            `<option value="${space.id}" ${space.selected ? 'selected' : ''}>${space.name}</option>`
-          ).join('')}
-        </select>
+      <div>
+        <div class="setting-item mod-horizontal">
+          <div class="setting-info>
+            <label for="current-space-select">Current Space</label>
+            <div class="setting-item-description">Choose the current space for the extension.</div>
+          </div>
+          <div class="setting-item-control">
+            <select id="current-space-select">
+              ${state.spaces.map(space =>
+                `<option value="${space.id}" ${state.currentSpace === space.id ? 'selected' : ''}>${space.name}</option>`
+              ).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="setting-item mod-horizontal">
+          <div class="setting-info>
+            <label for="openrouter-api-key">OpenRouter API Key</label>
+            <div class="setting-item-description">Enter your OpenRouter API key to use the extension.</div>
+          </div>
+          <div class="setting-item-control">
+            <input type="password" id="openrouter-api-key" value="${state.openRouterApiKey}">
+            <button id="show-btn" type="button">Show</button>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Hotkeys</label>
-        <ul id="hotkeys-list">
+      <div>
+        <h3>Hotkeys</h3>
+        <div class="list">
           ${state.hotKeys.map(hotkey =>
-            `<li class="hotkey-item"><strong>${hotkey.id}</strong> ${hotkey.description}</li>`
+            `<div class="list-item">
+              <span>${hotkey.description}</span>
+              <span class="setting-hotkey">${hotkey.id}</span>
+            </div>`
           ).join('')}
-        </ul>
+        </div>
       </div>
     `;
     // Add event listener for current space change
-    let currentSpaceSelect = document.getElementById('current-space-select');
+    let currentSpaceSelect = $('#current-space-select');
     if(currentSpaceSelect) {
       currentSpaceSelect.addEventListener('change', async function handleCurrentSpaceChange(event) {
-        let space = state.spaces.find(s => s.id === event.target.value);
-        let ok = await chrome.runtime.sendMessage({ type: "UPDATE_SPACE", payload:{...space, selected: true }});
+        let ok = await chrome.runtime.sendMessage({ type: "UPDATE_CONFIG", payload:{key: "currentSpace", value: event.target.value }});
         if(ok.success) {
-          console.log(`Selected space changed to: ${space.id}`);
+          console.log(`Selected space changed to: ${event.target.value}`);
         }
+      });
+    }
+
+    // API Key change
+    let apiKeyInput = $('#openrouter-api-key');
+    if (apiKeyInput) {
+      apiKeyInput.addEventListener('change', async function handleApiKeyChange(event) {
+        let ok = await chrome.runtime.sendMessage({ type: "UPDATE_CONFIG", payload: { key: "openRouterApiKey", value: event.target.value } });
+      });
+    }
+
+    // API Key visibility toggle
+    let showBtn = $('#show-btn');
+    if (showBtn && apiKeyInput) {
+      showBtn.addEventListener('click', function toggleVisibility() {
+        const currentType = apiKeyInput.getAttribute('type');
+        apiKeyInput.setAttribute('type', currentType === 'password' ? 'text' : 'password');
+        showBtn.textContent = currentType === 'password' ? 'Hide' : 'Show';
       });
     }
   }
@@ -120,19 +161,55 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
 
     contentArea.innerHTML = `
       <h2>Edit Space: ${space.name}</h2>
-      <div class="form-group">
-        <label for="space-name-input">Name</label>
-        <input type="text" id="space-name-input" value="${space.name}">
+      <div>
+      <div class="setting-item mod-horizontal">
+        <div class="setting-info">
+          <label for="space-name-input">Name</label>
+        </div>
+        <div class="setting-item-control">
+          <input type="text" id="space-name-input" value="${space.name}">
+        </div>
       </div>
-      <div class="form-group">
-        <label for="space-model-select">Model</label>
+      <div class="setting-item mod-horizontal">
+        <div class="setting-info">
+          <label for="space-model-select">Model</label>
+        </div>
+        <div class="setting-item-control">
         <select id="space-model-select">
-          ${state.models.map(model =>
-            `<option value="${model}" ${space.model === model ? 'selected' : ''}>${model}</option>`
-          ).join('')}
-        </select>
+            ${state.models.map(model =>
+              `<option value="${model.id}" ${space.model === model.id ? 'selected' : ''}>${model.name}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+      
+      </div>
+      <div>
+        <h3>Pages</h3>
+        <div>
+        ${space.sources.map(source => `
+          <div class="setting-item mod-horizontal">
+            <div class="setting-info">
+              <span>${source.url}</span>
+            </div> 
+            <div class="setting-item-control">
+              <button data-page-id="${source.id}"> remove </button>
+            </div> 
+          </div> 
+        `).join('')}
+        </div>
       </div>
     `;
+
+    document.addEventListener('click', async function handleRemoveSource(event) {
+      if(event.target.dataset.pageId) {
+        let response = await chrome.runtime.sendMessage({ type: "REMOVE_PAGE", payload:{spaceId: space.id, sourceId: event.target.dataset.pageId} });
+        if(response.success) {
+          space.sources = space.sources.filter(s => s.id !== event.target.dataset.pageId);
+          renderSpaceSettings();
+        }
+      }
+    });
 
     $(`#space-name-input`).addEventListener('change', async function handleNameChange(event) {
       let response = await chrome.runtime.sendMessage({ type: "UPDATE_SPACE", payload:{...space, name: event.target.value }});
@@ -149,18 +226,8 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
         renderSidebar();
       }
     });
+
   }
-
-
-  function renderSourcesList(sources, spaceId) {
-    return sources.map((source, index) => `
-      <li class="list-item" data-index="${index}">
-        <span>${source.url} (${source.type})</span>
-        <button class="remove-btn" data-space-id="${spaceId}" data-index="${index}">Remove</button>
-      </li>
-    `).join('');
-  }
-
   // --- Start the app ---
   initialize();
 });

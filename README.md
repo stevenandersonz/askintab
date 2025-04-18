@@ -8,16 +8,15 @@ Supercharge your browser with a LLM.
 "Ask in Tab" uses IndexedDB to store your spaces, sources and messages. 
 
 A Space is a collection of messages between you and the LLM. Messages in a space are shared between tabs and windows.
-A Source is context added to the user prompt:
-  - a tab: the text content of the selected tab.
-  - a highlight: the text content ofa highlight. You can create a highlight by selecting the text and clicking "add highlight to chat". If you click on the highlight in the chat it will be highlighted in the current page if present.
+Each space has a sources property, each source content will be appended to the message send to a provider. 
 
-You can connect your LLM in the settings, by bringing up the side chat with `CTRL+K` and clicking on the settings icon. there you need to find the configuration for the LLM you want to use and set the API_KEY.
+Available source types:
+  - Page: the content of a page can be added by clicking on the extension icon then click add to sources
+
+You can connect to any LLM through openrouter. 
+
 
 All messages send to the LLMs are only share between you and the provider.
-
-## Supported LLMs
-- OpenAI (gpt-4o): 
 
 ## Install
 1. Clone this repo: git clone https://github.com/stevenandersonz/askintab.git
@@ -27,10 +26,18 @@ All messages send to the LLMs are only share between you and the provider.
 5. open the side chat with `CRTL + K` or click on the extension icon
 6. click on the settings icon and set the API_KEY of the LLM you want to use
 
+
+## Set OpenRouter API KEY
+- Click the extension icon.
+- Click the settings icon.
+- Settings > General > open route api key
+- paste your key then hit enter 
+
 ## Extension Permisions
-- Tabs: to get the text content of a tab when use as a source 
-- Scripting: to inject the side chat into the current tab
+- ActiveTab: enable access to the current page. 
+- Scripting: To collect the content of the current page
 - Commands: to open the side chat with `CRTL + K`
+- SidePanel: open the chat in a side panel.
 
 ## Local Dependencies
 these are injected into the current tab when the extension is loaded and they are loaded from the `libs` folder.

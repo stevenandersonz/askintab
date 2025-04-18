@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html id="popup" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ask in Tab</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="libs/marked.min.js"></script>
+</head>
+<body>
+  <div id="popup-container">
+    <div id="popup-header">
+      <div id="space-container">
+        <div id="space-name"></div>
+      </div>
+      <div id="popup-actions">
+        <a href="#" id="open-settings" class="clickable-icon" data-i18n-title="settings" title="Settings">
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" data-lucide="settings" class="lucide lucide-settings lucide-icon"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+				</a>
+      </div>
+    </div>
+    <div class="clipper">
+      <div class="metadata-properties">
+        <div class="metadata-property">
+          <div class="metadata-property-key">source:</div>
+          <div id="metadata-source" class="metadata-property-value"></div>
+        </div>
+        <div class="metadata-property">
+          <div class="metadata-property-key">title:</div>
+          <div id="metadata-title" class="metadata-property-value"></div>
+        </div>
+      </div>
+      <div id="note-content-container">
+        <textarea id="page-content-field" rows="4" data-i18n="pagetextcontent" readonly></textarea>
+      </div>
+    <div class="clipper-footer">
+      <div class="action-buttons" id="action-buttons">
+        <button id="clip-btn" class="mod-cta">Add to Sources</button>
+      </div>
+    </div> 
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

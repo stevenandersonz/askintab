@@ -1,0 +1,61 @@
+/* minimal dark popover styling */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: #ffffff;
+    width: 300px;
+  }
+  .container {
+    padding: 12px 16px;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: normal;
+  }
+  .properties .prop {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .label {
+    text-transform: lowercase;
+    opacity: 0.7;
+  }
+  .value {
+    max-width: 60%;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .value a {
+    color: #8ab4f8;
+    text-decoration: none;
+  }
+  input#note-tags {
+    background: transparent;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #fff;
+    font-size: 13px;
+    padding: 2px 4px;
+    width: 100%;
+  }
+  button#add-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px;
+    font-size: 14px;
+    background: #a259ff;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+  }
+  button#add-btn:hover {
+    opacity: 0.9;
+  }
+  

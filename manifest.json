@@ -3,10 +3,10 @@
   "version": "0.1",
   "manifest_version": 3,
   "permissions": [
-    "tabs",
     "scripting",
     "commands",
-    "activeTab"
+    "activeTab",
+    "sidePanel"
   ],
   "background": {
     "service_worker": "background.js",
@@ -15,7 +15,8 @@
   "action": {
     "default_icon": {
       "128": "./askintab.png"
-    }
+    },
+    "default_popup": "popup.html"
   },
   "commands": {
     "toggle-chat": {
@@ -25,5 +26,8 @@
       },
       "description": "Toggle Ask in Tab chat"
     }
+  },
+  "side_panel": {
+    "default_path": "sidebar.html"
   }
 }

@@ -23,13 +23,13 @@ function openDB() {
   });
 }
 
-function crudOperation(storeName, method, value, key = undefined) {
+function crudOperation(debug, storeName, method, value, key = undefined) {
   return openDB().then(db => {
     return new Promise((resolve, reject) => {
       const mode = method === 'get' ? 'readonly' : 'readwrite';
       const tx = db.transaction(storeName, mode);
       const store = tx.objectStore(storeName);
-      console.log("crudOperation", storeName, method, value, key)
+      if(debug) console.log("crudOperation", storeName, method, value, key)
       const request = key === undefined ? store[method](value) : store[method](value, key);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -39,22 +39,40 @@ function crudOperation(storeName, method, value, key = undefined) {
 
 /* ================= CRUD OPERATIONS ================= */
 
-const db = {
-  addSpace: async (space) => crudOperation('spaces', 'add', space),
-  getSpace: async (id) => crudOperation('spaces', 'get', id),
-  getSpaces: async () => crudOperation('spaces', 'getAll'),
-  updateSpace: async (space) => crudOperation('spaces', 'put', space),
-  deleteSpace: async (id) => crudOperation('spaces', 'delete', id),
-  
-  // Messages
-  addMessage: async (message) => crudOperation('messages', 'add', message),
-  getMessages: async () => crudOperation('messages', 'getAll'),
-  clearMessages: async () => crudOperation('messages', 'clear'),
+const db = (debug = false) => {
+  crudOperation = crudOperation.bind(null, debug)
+  return {
+    addSpace: async (space) => crudOperation('spaces', 'add', space),
+    getSpace: async (id) => crudOperation('spaces', 'get', id),
+    getSpaces: async () => crudOperation('spaces', 'getAll'),
+    updateSpace: async (space) => crudOperation('spaces', 'put', space),
+    deleteSpace: async (id) => crudOperation('spaces', 'delete', id),
+    
+    // Messages
+    addMessage: async (message) => crudOperation('messages', 'add', message),
+    getMessages: async () => crudOperation('messages', 'getAll'),
+    getMessagesBySpaceId: async (spaceId) => {
+      if (!spaceId) return [];
+      
+      return openDB().then(db => {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('messages', 'readonly');
+          const store = tx.objectStore('messages');
+          const index = store.index('spaceId');
+          const request = index.getAll(spaceId);
+          
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      });
+    },
+    clearMessages: async () => crudOperation('messages', 'clear'),
 
-  // Config
-  addConfig: async (key, config) => crudOperation('config', 'add', config, key),
-  getConfig: async (key) => crudOperation('config', 'get', key),
-  updateConfig: async (key, config) => crudOperation('config', 'put', config, key),
-  deleteConfig: async (key) => crudOperation('config', 'delete', key)
+    // Config
+    addConfig: async (key, config) => crudOperation('config', 'add', config, key),
+    getConfig: async (key) => crudOperation('config', 'get', key),
+    updateConfig: async (key, config) => crudOperation('config', 'put', config, key),
+    deleteConfig: async (key) => crudOperation('config', 'delete', key)
+  }
 };
 export default db;
