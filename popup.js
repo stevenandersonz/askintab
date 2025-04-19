@@ -76,18 +76,18 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
   clipBtn.addEventListener('click', async function onClipBtnClick() {
    if (clipBtn.disabled) return;        // Early return – already clipped
     let response = await chrome.runtime.sendMessage({
-      type: 'ADD_PAGE',
+      type: 'ADD_SOURCE',
       payload: {
         spaceId: space.id,
-        page: {
-          url: tab.url,
-          title: tab.title,
-          content: text,
-          hash: hash
-        }
+        type: "page",
+        url: tab.url,
+        title: tab.title,
+        content: text,
+        hash: hash
       }
     })
     if(response.success) {
+      chrome.runtime.sendMessage({ type: "SYNC_SPACE" })
       clipBtn.innerText = "In Sources"
       clipBtn.disabled = true 
     }

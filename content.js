@@ -16,6 +16,7 @@ const S = {
   msgs: [],
   models: [],
   draft: '',
+  search: false,
 };
 
 /* ── DOM scaffold (same ids / classes as before) ────────────────────────── */
@@ -26,9 +27,10 @@ document.body.insertAdjacentHTML('beforeend', htmlTrim(`
 
       <div class="chat-input-container">
         <div class="badge-container"></div>
-        <textarea class="chat-input" placeholder="Ask anything... (Shift+Enter for newline)"></textarea>
+        <textarea class="chat-input" placeholder="type / to open the command menu"></textarea>
         <button class="send-btn" title="Send Message" disabled>Send</button>
         <select class="model-selector"></select>
+        <div class="slash-menu hidden"></div>
       </div>
     </div>
 
@@ -42,6 +44,7 @@ const UI = {
   send    : $('.send-btn'),
   badges  : $('.badge-container'),
   modelSelector: $('.model-selector'),
+  slashMenu: $('.slash-menu'),
 };
 
 /* ── Markdown & Mermaid ─────────────────────────────────────────────────── */
@@ -82,11 +85,36 @@ const renderMermaid = (host) => {
 };
 
 /*
-CSS needed for the download icon button (add to your stylesheet):
-
-
+-- slash menu UTILS --
 */
+const openSlashMenu = () => {
+  UI.slashMenu.innerHTML = `
+    <div class="slash-item" data-action="search">Search</div>
+    <div class="slash-item" data-action="sources">Sources</div>`;
+  UI.slashMenu.classList.remove('hidden');
+};
 
+const closeSlashMenu = () => UI.slashMenu.classList.add('hidden'); 
+
+const showSourceList = () => {
+  const list = S.space.sources.filter(s => !s.addToCtx);
+  console.log("list", list)
+  UI.slashMenu.innerHTML = list.length
+    ? list.map(s =>
+        `<div class="slash-item" data-action="source"
+             data-page-id="${s.id}">${esc(s.title)}</div>`).join('')
+    : '<div class="slash-item">‑‑ no sources ‑‑</div>';
+  UI.slashMenu.classList.remove('hidden');
+};
+
+const addSearchBadge = () => {
+  const badge = e('div', { className:'custom-badge', 'data-type':'search' });
+  const text  = e('span', { className:'custom-badge-text', textContent:'#search'});
+  const close = e('button',{className:'custom-badge-close',textContent:'×',title:'Remove search'});
+  close.onclick = () => { badge.remove(); S.search = false; };
+  badge.append(text, close);
+  UI.badges.insertBefore(badge, UI.badges.firstChild);
+};
 /* ── Message rendering ──────────────────────────────────────────────────── */
 const addMsg = (m) => {
   const assistant = m.role === 'assistant';
@@ -142,7 +170,7 @@ const sendDraft = () => {
 
   addMsg({ role: 'user', content });
 
-  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload: { content } })
+  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload: { content, search: S.search } })
 
   UI.input.value = '';
   updateSendBtn();
@@ -185,15 +213,54 @@ UI.modelSelector.onchange = async (e) => {
     S.space.model = e.target.value;
   }
 };
+UI.input.addEventListener('keydown', (e) => {
+  // open only when the user literally types '/'
+  if (e.key === '/' && !e.shiftKey) {
+    e.preventDefault();                 // don’t insert the slash
+    openSlashMenu();
+  }
+  // quick escape
+  if (e.key === 'Escape') closeSlashMenu();
+});
+UI.slashMenu.onclick = async (ev) => {
+  ev.stopPropagation();
+  const el = ev.target.closest('.slash-item');
+  if (!el) return;
+  let {action} = el.dataset;
+
+  if(action === 'search') {
+    if (!S.search) { addSearchBadge(); S.search = true; } 
+    closeSlashMenu();
+  }
+  if(action === 'sources') {
+    showSourceList();              // open list in‑place
+  }
+  if(action === 'source') {
+    const src = S.space.sources.find(s => s.id === el.dataset.pageId);
+    if (!src) return;
+    addBadge(src);                 // reuse existing helper
+    await chrome.runtime.sendMessage({
+      type   : 'TOGGLE_SOURCE_CTX',
+      payload: { spaceId: S.space.id, sourceId: src.id }
+    });
+    closeSlashMenu();
+  }
+};
+
+document.addEventListener('click', (e) => {
+  if (!UI.slashMenu.contains(e.target) && e.target !== UI.input) closeSlashMenu();
+});
 
 
 chrome.runtime.onMessage.addListener(async (msg) => {
+
   if (msg.type === 'SYNC_SPACE') {
     UI.badges.innerHTML = '';
     UI.modelSelector.innerHTML = '';
     UI.list.innerHTML = '';
     await init();
   }
+
   if (msg.type === 'ASSISTANT_MESSAGE') {
     addMsg({ role: 'assistant', content: msg.payload.content, annotations: msg.payload.annotations });
   }

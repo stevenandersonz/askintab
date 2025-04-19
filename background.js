@@ -76,8 +76,8 @@ function createListener(handlerMap) {
 /* Handlers – just return data or a Promise. No sendResponse required */
 /* ------------------------------------------------------------------ */
 const handlers = {
-  NEW_MESSAGE: ({ content }) => {
-    sendToProvider(db, content, DEBUG);
+  NEW_MESSAGE: ({ content, search }) => {
+    sendToProvider(db, content, search, DEBUG);
     return { success: true };
   },
 
@@ -128,11 +128,11 @@ const handlers = {
     const space = await db.getSpace(payload.spaceId);
     space.sources.push({
       id,
-      type: 'page',
-      url: payload.page.url,
-      content: payload.page.content,
-      title: payload.page.title,
-      hash: payload.page.hash,
+      type: payload.type,
+      url: payload.url,
+      content: payload.content,
+      title: payload.title,
+      hash: payload.hash,
       addToCtx: true
     });
     await db.updateSpace(space);
