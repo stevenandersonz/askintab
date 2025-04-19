@@ -28,6 +28,8 @@ export const models = [
   }
 ]
 
+export const DEFAULT_MODEL = "openai/gpt-4o-2024-11-20"
+
 async function forwardToOpenRouter(content, model, apiKey, online = false) {
   let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',

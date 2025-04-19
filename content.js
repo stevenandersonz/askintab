@@ -150,7 +150,6 @@ const sendDraft = () => {
 };
 
 const addBadge = (source) => {
-  if (!S.space.sources?.length) return;
   const txt = source.title.length > 20 ? `${source.title.slice(0, 17)}…` : source.title;
 
   const badge = e('div', { className: 'custom-badge', title: source.title });
@@ -159,9 +158,8 @@ const addBadge = (source) => {
 
   close.onclick = async (ev) => {
     ev.stopPropagation();
-    const ok = await chrome.runtime.sendMessage({ type: 'REMOVE_PAGE', payload: { spaceId: S.space.id, sourceId: source.id } });
+    const ok = await chrome.runtime.sendMessage({ type: 'TOGGLE_SOURCE_CTX', payload: { spaceId: S.space.id, sourceId: source.id } });
     if (ok.success) {
-      S.space.sources = S.space.sources.filter(s => s.id !== source.id);
       badge.remove();
       updateSendBtn();
     }
@@ -210,7 +208,7 @@ async function init() {
       chrome.runtime.sendMessage({ type: 'GET_MODELS' })
     ]);
     S.msgs.forEach(addMsg);
-    S.space.sources.forEach(addBadge);
+    S.space.sources.filter(s => s.addToCtx).forEach(addBadge);
     S.models.forEach(addModelOption);
   } catch (e) { console.error('AskInTab init error', e); }
 }

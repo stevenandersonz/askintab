@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
     spaces: [],
     hotKeys: [{ description: "open side chat", id: "cmd+k" }],
     openRouterApiKey: '',
-    currentSpace: '',
+    currentSpace: '',//id of the current space
   };
   // utils
   const $ = (selector) => document.querySelector(selector);
@@ -42,6 +42,19 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
       renderSidebar();
       renderContent();
      });
+
+     document.addEventListener('click', async function handleRemoveSource(event) {
+      if(event.target.dataset.pageId) {
+        let response = await chrome.runtime.sendMessage({ type: "TOGGLE_SOURCE_CTX", payload:{spaceId: state.currentSpace, sourceId: event.target.dataset.pageId} });
+        if(response.success) {
+          let space = state.spaces.find((space)=>space.id === state.currentSpace);
+          let source = space.sources.find((source)=>source.id === event.target.dataset.pageId);
+          source.addToCtx = !(source.addToCtx);
+          renderSpaceSettings();
+          await chrome.runtime.sendMessage({ type: "SYNC_SPACE" });
+        }
+      }
+    });
   }
 
   // --- Routing ---
@@ -200,7 +213,7 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
               <span>${source.url}</span>
             </div> 
             <div class="setting-item-control">
-              <button data-page-id="${source.id}"> remove </button>
+              <button data-page-id="${source.id}"> ${source.addToCtx ? 'remove from context' : 'add to context'} </button>
             </div> 
           </div> 
         `).join('')}
@@ -208,15 +221,7 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
       </div>
     `;
 
-    document.addEventListener('click', async function handleRemoveSource(event) {
-      if(event.target.dataset.pageId) {
-        let response = await chrome.runtime.sendMessage({ type: "REMOVE_PAGE", payload:{spaceId: space.id, sourceId: event.target.dataset.pageId} });
-        if(response.success) {
-          space.sources = space.sources.filter(s => s.id !== event.target.dataset.pageId);
-          renderSpaceSettings();
-        }
-      }
-    });
+    
 
     $(`#space-name-input`).addEventListener('change', async function handleNameChange(event) {
       let response = await chrome.runtime.sendMessage({ type: "UPDATE_SPACE", payload:{...space, name: event.target.value }});
@@ -230,6 +235,7 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
       let response = await chrome.runtime.sendMessage({ type: "UPDATE_SPACE", payload:{...space, model: event.target.value }});
       if(response.success) {
         space.model = event.target.value;
+        await chrome.runtime.sendMessage({ type: "SYNC_SPACE" });
         renderSidebar();
       }
     });
@@ -237,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async function onDOMContentLoaded(
     $(`#delete-messages-btn`).addEventListener('click', async function handleDeleteMessages(event) {
       let response = await chrome.runtime.sendMessage({ type: "DELETE_MESSAGES", payload:{spaceId: space.id} });
       if(response.success) {
-        renderSpaceSettings();
+        await chrome.runtime.sendMessage({ type: "SYNC_SPACE" });
       }
     });
 

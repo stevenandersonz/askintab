@@ -1,4 +1,4 @@
-import {sendToProvider, models} from "./provider.js"
+import {sendToProvider, models, DEFAULT_MODEL} from "./provider.js"
 import setDB from "./db.js"
 
 const DEBUG = true
@@ -86,7 +86,6 @@ const handlers = {
 
   DELETE_MESSAGES: async payload => {
     await db.clearMessages(payload.spaceId);
-    chrome.runtime.sendMessage({ type: 'SYNC_SPACE' });
     return { success: true };
   },
 
@@ -97,7 +96,7 @@ const handlers = {
       id: crypto.randomUUID(),
       name: 'New Space',
       createdAt: Date.now(),
-      model: 'gpt-4o',
+      model: DEFAULT_MODEL,
       sources: [],
     };
     await db.addSpace(newSpace);
@@ -124,7 +123,7 @@ const handlers = {
 
   GET_CONFIG: key => db.getConfig(key),
 
-  ADD_PAGE: async payload => {
+  ADD_SOURCE: async payload => {
     const id = crypto.randomUUID();
     const space = await db.getSpace(payload.spaceId);
     space.sources.push({
@@ -133,16 +132,18 @@ const handlers = {
       url: payload.page.url,
       content: payload.page.content,
       title: payload.page.title,
-      hash: payload.page.hash
+      hash: payload.page.hash,
+      addToCtx: true
     });
     await db.updateSpace(space);
-    chrome.runtime.sendMessage({ type: 'SYNC_SPACE' });
     return { success: true, id };
   },
 
-  REMOVE_PAGE: async payload => {
+  TOGGLE_SOURCE_CTX: async payload => {
     const space = await db.getSpace(payload.spaceId);
-    space.sources = space.sources.filter(s => s.id !== payload.sourceId);
+    let source = space.sources.find(s => s.id === payload.sourceId);
+    if(!source) return { success: false, error: 'Source not found' };
+    source.addToCtx = !source.addToCtx;
     await db.updateSpace(space);
     return { success: true };
   },
@@ -167,7 +168,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
             id,
             name: 'default',
             createdAt: Date.now(),
-            model: "openai/gpt-4o-2024-11-20",
+            model: DEFAULT_MODEL,
             sources: []
           }),
           db.updateConfig("currentSpace", id),
