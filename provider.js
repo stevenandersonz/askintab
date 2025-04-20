@@ -2,8 +2,6 @@ const SYSTEM_PROMPT = `
 if user request diagrams default to mermaid.js and return the graph syntax inside \`\`\`mermaid \`\`\`,
 for your graphs do not use parenthesis for text labels, and make sure the syntax is correct.
 only return a mermaid diagram if the user asks for one.
-Add 3 follow up question to expand on your response, and phrase them as further prompts to yourself.
-each question should be surrounded by <q> </q>
 the user message will be formatted as:
 context: <context>
 user: <message>
