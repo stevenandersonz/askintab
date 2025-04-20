@@ -9,6 +9,11 @@ async function toggleSidePanel(tab) {
     console.error("AskInTab: Invalid tab provided for side panel toggle.");
     return;
   }
+  // Return early for prohibited URLs like chrome://
+  if (tab.url && tab.url.startsWith("chrome://")) {
+    if (DEBUG) console.warn("AskInTab: Prohibited URL, cannot open side panel:", tab.url);
+    return;
+  }
   try {
     const windowId = tab.windowId;
     if (!windowId) {
@@ -76,8 +81,8 @@ function createListener(handlerMap) {
 /* Handlers – just return data or a Promise. No sendResponse required */
 /* ------------------------------------------------------------------ */
 const handlers = {
-  NEW_MESSAGE: ({ content, search }) => {
-    sendToProvider(db, content, search, DEBUG);
+  NEW_MESSAGE: ({ content, search, standalone }) => {
+    sendToProvider(db, content, search, standalone, DEBUG);
     return { success: true };
   },
 

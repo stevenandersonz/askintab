@@ -17,6 +17,7 @@ const S = {
   models: [],
   draft: '',
   search: false,
+  standalone: false,
 };
 
 /* ── DOM scaffold (same ids / classes as before) ────────────────────────── */
@@ -89,6 +90,7 @@ const renderMermaid = (host) => {
 */
 const openSlashMenu = () => {
   UI.slashMenu.innerHTML = `
+    <div class="slash-item" data-action="standalone">Standalone</div>
     <div class="slash-item" data-action="search">Search</div>
     <div class="slash-item" data-action="sources">Sources</div>`;
   UI.slashMenu.classList.remove('hidden');
@@ -107,14 +109,7 @@ const showSourceList = () => {
   UI.slashMenu.classList.remove('hidden');
 };
 
-const addSearchBadge = () => {
-  const badge = e('div', { className:'custom-badge', 'data-type':'search' });
-  const text  = e('span', { className:'custom-badge-text', textContent:'#search'});
-  const close = e('button',{className:'custom-badge-close',textContent:'×',title:'Remove search'});
-  close.onclick = () => { badge.remove(); S.search = false; };
-  badge.append(text, close);
-  UI.badges.insertBefore(badge, UI.badges.firstChild);
-};
+
 /* ── Message rendering ──────────────────────────────────────────────────── */
 const addMsg = (m) => {
   const assistant = m.role === 'assistant';
@@ -170,26 +165,39 @@ const sendDraft = () => {
 
   addMsg({ role: 'user', content });
 
-  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload: { content, search: S.search } })
+  chrome.runtime.sendMessage({ type: 'NEW_MESSAGE', payload: { content, search: S.search, standalone: S.standalone } })
 
   UI.input.value = '';
   updateSendBtn();
   showTyping();
 };
 
-const addBadge = (source) => {
-  const txt = source.title.length > 20 ? `${source.title.slice(0, 17)}…` : source.title;
+const addBadge = ({title, type, id}) => {
+  const txt = title.length > 20 ? `${title.slice(0, 17)}…` : title;
 
-  const badge = e('div', { className: 'custom-badge', title: source.title });
+  const badge = e('div', { className: 'custom-badge', title });
   const text  = e('span', { className: 'custom-badge-text', textContent: txt });
   const close = e('button', { className: 'custom-badge-close', textContent: '×', title: 'Remove Source' });
 
   close.onclick = async (ev) => {
     ev.stopPropagation();
-    const ok = await chrome.runtime.sendMessage({ type: 'TOGGLE_SOURCE_CTX', payload: { spaceId: S.space.id, sourceId: source.id } });
-    if (ok.success) {
+    console.log("type", type)
+    if(type === 'page') {
+      const ok = await chrome.runtime.sendMessage({ type: 'TOGGLE_SOURCE_CTX', payload: { spaceId: S.space.id, sourceId: id } });
+      if (ok.success) {
+        badge.remove();
+        updateSendBtn();
+      }
+    }
+
+    if(type === 'search') {
       badge.remove();
-      updateSendBtn();
+      S.search = false;
+    }
+
+    if(type === 'standalone') {
+      badge.remove();
+      S.standalone = false;
     }
   };
 
@@ -227,9 +235,9 @@ UI.slashMenu.onclick = async (ev) => {
   const el = ev.target.closest('.slash-item');
   if (!el) return;
   let {action} = el.dataset;
-
-  if(action === 'search') {
-    if (!S.search) { addSearchBadge(); S.search = true; } 
+  let msgCfgBadges = ["search", "standalone"]
+  if(msgCfgBadges.includes(action)) {
+    if (!S[action]) { addBadge({title: `#${action}`, type: action}); S[action] = true; } 
     closeSlashMenu();
   }
   if(action === 'sources') {

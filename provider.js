@@ -28,7 +28,7 @@ export const models = [
 
 export const DEFAULT_MODEL = "openai/gpt-4o-2024-11-20"
 
-async function forwardToOpenRouter(content, model, apiKey, search = false) {
+async function forwardToOpenRouter({content, model, apiKey, search, history, debug}) {
   let response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -39,10 +39,11 @@ async function forwardToOpenRouter(content, model, apiKey, search = false) {
     },
     body: JSON.stringify({
       model: model + (search ? ":online" : ""),
-      messages: [{role: 'system', content: SYSTEM_PROMPT}, {role: 'user', content: content}],
+      messages: [...history, {role: 'system', content: SYSTEM_PROMPT}, {role: 'user', content: content}],
     }),
   });
   response = await response.json()
+  if(debug) console.log("response", response)
   if(response.error) {
     console.error("error", response.error)
     return {success: false, error: response.error}
@@ -50,12 +51,18 @@ async function forwardToOpenRouter(content, model, apiKey, search = false) {
   return {success: true, content: response.choices[0].message.content, annotations: response.choices[0].message.annotations}
 }
 
-export async function sendToProvider(db, content, search = false,  debug = false) {
+export async function sendToProvider(db, content, search = false, standalone = false, debug = false) {
   let [spaceid, apiKey] = await Promise.all([
     db.getConfig("currentSpace"),
     db.getConfig("openRouterApiKey")
   ])
   let space = await db.getSpace(spaceid)
+  let history = []
+  if(!standalone) {
+    history = await db.getMessages(space.id)
+    history = history.map(msg => ({content: msg.content, role: msg.role}))
+  }
+  if(debug) console.log("history", history)
   let ok = await db.addMessage({ content, model: space.model, sources: space.sources.map(s=>s.id), spaceId: space.id, role: "user", search: search, timestamp: Date.now()})
   if (!ok) chrome.runtime.sendMessage({type: "ERROR", payload: {error: "Error sending message to provider"}})
   let cxt = space.sources.map(s => {
@@ -66,7 +73,7 @@ export async function sendToProvider(db, content, search = false,  debug = false
   if(debug) console.log("cxt", cxt)
   if(debug) console.log("search", search)
   
-  let response = await forwardToOpenRouter("context: " + cxt + "\nuser: " + content, space.model, apiKey, search)
+  let response = await forwardToOpenRouter({content: "context: " + cxt + "\nuser: " + content, model: space.model, apiKey: apiKey, search: search, history: history, debug: debug})
 
   if(debug) console.log("response", response)
   if (!response.success) chrome.runtime.sendMessage({type: "ERROR", payload: {error: response.error}})
